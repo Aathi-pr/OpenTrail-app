@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>329404137758-7eji94foukaqbm5lquim8tmhmqvomiij.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.329404137758-7eji94foukaqbm5lquim8tmhmqvomiij</string>
+	<key>ANDROID_CLIENT_ID</key>
+	<string>329404137758-j99lccb97oak2ie68m5pnq0l1boc19h7.apps.googleusercontent.com</string>
+	<key>API_KEY</key>
+	<string>AIzaSyD0EZ9xVpODWoj9sgB17KmrR1LdFkHT7r4</string>
+	<key>GCM_SENDER_ID</key>
+	<string>329404137758</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.openTrail</string>
+	<key>PROJECT_ID</key>
+	<string>opentrail-app</string>
+	<key>STORAGE_BUCKET</key>
+	<string>opentrail-app.firebasestorage.app</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:329404137758:ios:bdc7f5bbf53f6ed658c90f</string>
+	<key>DATABASE_URL</key>
+	<string>https://opentrail-app-default-rtdb.firebaseio.com</string>
+</dict>
+</plist>
