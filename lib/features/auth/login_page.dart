@@ -8,75 +8,107 @@ class LoginPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const bg = Color(0xFF0A0A0A);
+    const fg = Color(0xFFF4F4F2);
+    const secondary = Color(0xFF8B8B8B);
+    const border = Color(0xFF242424);
+    const card = Color(0xFF111111);
+
     return Scaffold(
+      backgroundColor: bg,
       body: Stack(
         children: [
-          // Background Image
-          Positioned.fill(
-            child: RotatedBox(
-              quarterTurns: 1,
-              child: Image.asset("assets/background.png", fit: BoxFit.cover),
-            ),
-          ),
-          Positioned.fill(
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-              child: Container(color: Colors.black.withOpacity(0.45)),
-            ),
-          ),
+
           SafeArea(
-            child: Center(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppBar(
-                    title: Text(
-                      "O P E N   T R A I L",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    backgroundColor: Colors.transparent,
-                  ),
-                  SizedBox(height: 50),
-                  Text(
-                    "Sign in to create ride sessions,\njoin your group, and ride together.",
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: Color(0xB3FFFFFF), // ~70% white opacity
-                      fontSize: 15,
-                      fontWeight: FontWeight.w500,
-                      height: 1.55,
-                      letterSpacing: -0.2,
+                  const Text(
+                    "OPEN TRAIL",
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: 18,
+                      letterSpacing: 6,
+                      fontWeight: FontWeight.w300,
                     ),
                   ),
-                  SizedBox(height: MediaQuery.of(context).size.height * 0.63),
+
+                  const SizedBox(height: 44),
+
+
+                  const Text(
+                    "Ride\nTogether.",
+                    style: TextStyle(
+                      color: fg,
+                      fontSize: 54,
+                      height: .95,
+                      fontWeight: FontWeight.w300,
+                    ),
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  const Text(
+                    "Create shared rides,\n"
+                    "navigate together,\n"
+                    "and stay connected.",
+                    style: TextStyle(
+                      color: secondary,
+                      fontSize: 18,
+                      height: 1.6,
+                    ),
+                  ),
+
+                  const Spacer(),
+
                   Material(
                     color: Colors.transparent,
-                    borderRadius: BorderRadius.all(Radius.circular(50)),
                     child: InkWell(
-                      borderRadius: BorderRadius.all(Radius.circular(50)),
                       onTap: () async {
                         final auth = AuthService();
-                           await auth.signInWithGoogle();
+                        await auth.signInWithGoogle();
                       },
                       child: Container(
-                        height: 50,
-                        width: MediaQuery.of(context).size.width * 0.85,
+                        height: 70,
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.all(Radius.circular(50)),
+                          color: card,
+                          border: Border.all(color: border),
                         ),
-                        // color: Colors.white,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(12.0),
-                              child: Image.asset("assets/g.png"),
-                            ),
-                            Text("Sign In with Google"),
-                          ],
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 22),
+                          child: Row(
+                            children: [
+                              Image.asset("assets/g.png", width: 22),
+
+                              const SizedBox(width: 18),
+
+                              const Expanded(
+                                child: Text(
+                                  "CONTINUE WITH GOOGLE",
+                                  style: TextStyle(
+                                    color: fg,
+                                    letterSpacing: 2,
+                                    fontSize: 15,
+                                  ),
+                                ),
+                              ),
+
+                              const Icon(Icons.arrow_forward, color: fg),
+                            ],
+                          ),
                         ),
                       ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 18),
+
+                  const Center(
+                    child: Text(
+                      "By continuing you agree to the Terms.",
+                      style: TextStyle(color: secondary, fontSize: 12),
                     ),
                   ),
                 ],

@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:open_trail/models/ride_model.dart';
+import 'package:open_trail/models/rider_location_model.dart';
 import 'package:open_trail/services/firestore_service.dart';
 
 class RideService {
@@ -46,13 +47,29 @@ class RideService {
             'createdAt': FieldValue.serverTimestamp(),
           });
 
+          // transaction.set(rideDocument, {
+          //   'rideId': rideId,
+          //   'leaderId': user.uid,
+          //   'leaderName': leaderName,
+          //   'destination': destination,
+          //   'destinationLatitude': destinationLatitude,
+          //   'destinationLongitude': destinationLongitude,
+          //   'createdAt': FieldValue.serverTimestamp(),
+          //   'status': RideStatus.active,
+          //   'memberCount': 1,
+          // });
+
           transaction.set(rideDocument, {
             'rideId': rideId,
             'leaderId': user.uid,
             'leaderName': leaderName,
+
             'destination': destination,
             'destinationLatitude': destinationLatitude,
             'destinationLongitude': destinationLongitude,
+
+            'isNavigating': false,
+
             'createdAt': FieldValue.serverTimestamp(),
             'status': RideStatus.active,
             'memberCount': 1,
@@ -80,6 +97,7 @@ class RideService {
             createdAt: DateTime.now(),
             status: RideStatus.active,
             memberCount: 1,
+            isNavigating: false,
           );
         }
       }
@@ -220,6 +238,144 @@ class RideService {
       throw _firebaseRideException(error);
     }
   }
+
+Future<void> updateDestination(
+    String rideDocumentId, {
+    required String destination,
+    required double latitude,
+    required double longitude,
+  }) async {
+    try {
+      final user = _requireCurrentUser();
+
+      final rideDoc = _firestoreService.ridesCollection.doc(rideDocumentId);
+
+      final snapshot = await rideDoc.get();
+
+      if (!snapshot.exists) {
+        throw RideException("Ride not found.");
+      }
+
+      final ride = RideModel.fromFirestore(snapshot);
+
+      if (ride.leaderId != user.uid) {
+        throw RideException("Only the leader can change destination.");
+      }
+
+      await rideDoc.update({
+        'destination': destination,
+        'destinationLatitude': latitude,
+        'destinationLongitude': longitude,
+      });
+    } on FirebaseException catch (error) {
+      throw _firebaseRideException(error);
+    }
+  }
+
+  Future<void> startRideNavigation(String rideDocumentId) async {
+    try {
+      final user = _requireCurrentUser();
+
+      final rideDoc = _firestoreService.ridesCollection.doc(rideDocumentId);
+
+      final snapshot = await rideDoc.get();
+
+      if (!snapshot.exists) {
+        throw RideException("Ride not found.");
+      }
+
+      final ride = RideModel.fromFirestore(snapshot);
+
+      if (ride.leaderId != user.uid) {
+        throw RideException("Only the leader can start navigation.");
+      }
+
+      await rideDoc.update({'isNavigating': true});
+    } on FirebaseException catch (error) {
+      throw _firebaseRideException(error);
+    }
+  }
+
+  Future<void> stopRideNavigation(String rideDocumentId) async {
+    try {
+      final user = _requireCurrentUser();
+
+      final rideDoc = _firestoreService.ridesCollection.doc(rideDocumentId);
+
+      final snapshot = await rideDoc.get();
+
+      if (!snapshot.exists) {
+        throw RideException("Ride not found.");
+      }
+
+      final ride = RideModel.fromFirestore(snapshot);
+
+      if (ride.leaderId != user.uid) {
+        throw RideException("Only the leader can stop navigation.");
+      }
+
+      await rideDoc.update({'isNavigating': false});
+    } on FirebaseException catch (error) {
+      throw _firebaseRideException(error);
+    }
+  }
+
+
+
+  // ---- Convoy / live location tracking ----
+
+  /// Pushes the current user's live position to their member doc for this ride.
+  /// Call this on a throttled basis (e.g. every few seconds or N meters moved),
+  /// not on every single GPS callback.
+  Future<void> updateMemberLocation(
+    String rideDocumentId, {
+    required double latitude,
+    required double longitude,
+    double? heading,
+    double? speed,
+  }) async {
+    try {
+      final user = _requireCurrentUser();
+      final memberDocument = _firestoreService.ridesCollection
+          .doc(rideDocumentId)
+          .collection('members')
+          .doc(user.uid);
+
+      await memberDocument.set({
+        'latitude': latitude,
+        'longitude': longitude,
+        'heading': heading,
+        'speed': speed,
+        'locationUpdatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } on FirebaseException catch (error) {
+      throw _firebaseRideException(error);
+    }
+  }
+
+  /// Streams every member of the ride (including yourself). The MapPage is
+  /// responsible for filtering out its own uid and members without a location yet.
+  Stream<List<RiderLocationModel>> watchMemberLocations(String rideDocumentId) {
+    return _firestoreService.ridesCollection
+        .doc(rideDocumentId)
+        .collection('members')
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => RiderLocationModel.fromFirestore(doc))
+              .toList();
+        })
+        .handleError((error) {
+          if (error is FirebaseException) {
+            throw _firebaseRideException(error);
+          }
+          throw error;
+        });
+  }
+
+  /// Convenience getter so callers (like MapPage) can identify "self" in a
+  /// stream of RiderLocationModel without re-importing FirebaseAuth everywhere.
+  String? get currentUserId => _auth.currentUser?.uid;
 
   RideException _firebaseRideException(FirebaseException error) {
     if (error.code == 'not-found') {

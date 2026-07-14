@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 class AuthService {
@@ -10,7 +11,9 @@ class AuthService {
   }
 
   Future<void> _initialize() async {
-    await _googleSignIn.initialize();
+    await _googleSignIn.initialize(
+      serverClientId: dotenv.env['GOOGLE_WEB_CLIENT_ID'],
+    );
   }
 
   Future<User?> signInWithGoogle() async {

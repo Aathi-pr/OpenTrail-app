@@ -13,6 +13,7 @@ class RideModel {
     required this.leaderName,
     required this.status,
     required this.memberCount,
+    required this.isNavigating,
     this.destination,
     this.destinationLatitude,
     this.destinationLongitude,
@@ -23,12 +24,17 @@ class RideModel {
   final String rideId;
   final String leaderId;
   final String leaderName;
+
   final String? destination;
   final double? destinationLatitude;
   final double? destinationLongitude;
+
   final DateTime? createdAt;
   final String status;
   final int memberCount;
+
+  /// True when the leader has started navigation.
+  final bool isNavigating;
 
   bool get isActive => status == RideStatus.active;
 
@@ -49,6 +55,7 @@ class RideModel {
       createdAt: createdAt is Timestamp ? createdAt.toDate() : null,
       status: data['status'] as String? ?? RideStatus.active,
       memberCount: data['memberCount'] as int? ?? 0,
+      isNavigating: data['isNavigating'] as bool? ?? false,
     );
   }
 
@@ -63,6 +70,7 @@ class RideModel {
       'createdAt': createdAt == null ? null : Timestamp.fromDate(createdAt!),
       'status': status,
       'memberCount': memberCount,
+      'isNavigating': isNavigating,
     };
   }
 
@@ -77,6 +85,7 @@ class RideModel {
     DateTime? createdAt,
     String? status,
     int? memberCount,
+    bool? isNavigating,
   }) {
     return RideModel(
       documentId: documentId ?? this.documentId,
@@ -89,6 +98,7 @@ class RideModel {
       createdAt: createdAt ?? this.createdAt,
       status: status ?? this.status,
       memberCount: memberCount ?? this.memberCount,
+      isNavigating: isNavigating ?? this.isNavigating,
     );
   }
 }
