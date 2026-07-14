@@ -10,11 +10,13 @@ import 'package:flutter_map_animations/flutter_map_animations.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
-import 'package:open_trail/delegates/location_search_delegate.dart';
 import 'package:open_trail/models/ride_model.dart';
 import 'package:open_trail/models/rider_location_model.dart';
+import 'package:open_trail/services/location_search_service.dart';
 import 'package:open_trail/services/ride_service.dart';
 import 'package:open_trail/services/route_service.dart';
+import 'package:open_trail/widgets/inline_search_bar.dart';
+import 'package:open_trail/widgets/inline_search_results.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key, this.rideDocumentId, this.initialRide});
@@ -30,8 +32,11 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   late final AnimatedMapController _animatedMapController;
   final RideService _rideService = RideService();
   final RouteService _routeService = RouteService();
+  final LocationSearchService _searchService = LocationSearchService();
+
   StreamSubscription<RideModel?>? _rideSubscription;
   RideModel? _currentRide;
+  bool isSatteliteMode = false;
 
   Position? _currentPosition;
   LatLng? _searchedLocation;
@@ -39,6 +44,10 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   List<LatLng> _completedRoute = [];
   bool _isNavigating = false;
   bool _routeReceived = false;
+
+  bool _isSearching = false;
+  String _searchQuery = "";
+  final TextEditingController _searchController = TextEditingController();
 
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<Position>? _navigationSubscription;
@@ -51,6 +60,11 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   static const _locationPushInterval = Duration(seconds: 4);
   static const _locationPushMinDistanceMeters = 8;
 
+  // State Management Flags for Loading and Permissions
+  bool _isLoadingLocation = true;
+  bool _isLocationServiceDisabled = false;
+  String _cachedUserName = "You";
+
   @override
   void initState() {
     super.initState();
@@ -61,9 +75,17 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
       curve: Curves.easeInOutCubic,
     );
 
+    _cacheUserProfile();
     _initializeLocation();
     _listenToConvoy();
     _listenToRide();
+  }
+
+  void _cacheUserProfile() {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user?.displayName?.trim().isNotEmpty == true) {
+      _cachedUserName = user!.displayName!;
+    }
   }
 
   void _listenToRide() {
@@ -76,12 +98,8 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
 
       _currentRide = ride;
 
-      // Ignore updates if I'm the leader.
-      if (ride.leaderId == _rideService.currentUserId) {
-        return;
-      }
+      if (ride.leaderId == _rideService.currentUserId) return;
 
-      // Leader stopped navigation.
       if (!ride.isNavigating) {
         if (_isNavigating) {
           _navigationSubscription?.cancel();
@@ -92,23 +110,18 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
           });
 
           _routeReceived = false;
-
           _startGeneralPositionStream();
         }
-
         return;
       }
 
-      // Already following this route.
       if (_routeReceived) return;
 
-      // Destination not set yet.
       if (ride.destinationLatitude == null ||
           ride.destinationLongitude == null) {
         return;
       }
 
-      // Wait until GPS is available.
       if (_currentPosition == null) return;
 
       final destination = LatLng(
@@ -134,7 +147,6 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
         });
 
         _routeReceived = true;
-
         await startNavigation();
       } catch (e) {
         debugPrint("Failed to build convoy route: $e");
@@ -150,9 +162,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
         .listen(
           (riders) {
             if (!mounted) return;
-
             final selfId = _rideService.currentUserId;
-
             setState(() {
               _otherRiders = riders
                   .where((r) => r.userId != selfId && r.hasLocation)
@@ -193,7 +203,6 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
         heading: position.heading,
         speed: position.speed,
       );
-      // ignore: empty_catches
     } catch (e) {}
   }
 
@@ -209,14 +218,13 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
       _isNavigating = true;
     });
 
-if (widget.rideDocumentId != null &&
+    if (widget.rideDocumentId != null &&
         widget.initialRide?.leaderId == _rideService.currentUserId) {
       await _rideService.startRideNavigation(widget.rideDocumentId!);
     }
 
     await _positionSubscription?.cancel();
     _positionSubscription = null;
-
     await _navigationSubscription?.cancel();
 
     _navigationSubscription =
@@ -226,7 +234,6 @@ if (widget.rideDocumentId != null &&
             distanceFilter: 3,
           ),
         ).listen((position) async {
-          debugPrint("📍 ${position.latitude}, ${position.longitude}");
           if (!mounted) return;
 
           final current = LatLng(position.latitude, position.longitude);
@@ -237,7 +244,6 @@ if (widget.rideDocumentId != null &&
                 distance(current, _remainingRoute.first) < 15) {
               _completedRoute.add(_remainingRoute.removeAt(0));
             }
-
             setState(() {});
           }
 
@@ -246,7 +252,6 @@ if (widget.rideDocumentId != null &&
           });
 
           _animatedMapController.animateTo(dest: current, zoom: 18);
-
           _maybePushLocation(position);
 
           final remainingDistance = const Distance().as(
@@ -255,23 +260,18 @@ if (widget.rideDocumentId != null &&
             _searchedLocation!,
           );
 
-          debugPrint("Remaining: ${remainingDistance.toStringAsFixed(1)} m");
-
           if (remainingDistance < 20) {
             stopNavigation();
-
             if (!mounted) return;
-
             ScaffoldMessenger.of(
               context,
             ).showSnackBar(const SnackBar(content: Text("You've arrived 🎉")));
-
             return;
           }
         }, onError: (e) {});
   }
 
-void stopNavigation() {
+  void stopNavigation() {
     _navigationSubscription?.cancel();
     _navigationSubscription = null;
 
@@ -279,7 +279,6 @@ void stopNavigation() {
       _isNavigating = false;
     });
 
-    // Only the leader should notify everyone that navigation stopped.
     if (widget.rideDocumentId != null &&
         widget.initialRide?.leaderId == _rideService.currentUserId) {
       _rideService.stopRideNavigation(widget.rideDocumentId!);
@@ -288,47 +287,63 @@ void stopNavigation() {
     _startGeneralPositionStream();
   }
 
-  @override
-  void dispose() {
-    _positionSubscription?.cancel();
-    _navigationSubscription?.cancel();
-    _memberLocationsSubscription?.cancel();
-    _rideSubscription?.cancel();
-    super.dispose();
-  }
-
   Future<void> _initializeLocation() async {
-    if (!await Geolocator.isLocationServiceEnabled()) return;
+    setState(() {
+      _isLoadingLocation = true;
+      _isLocationServiceDisabled = false;
+    });
+
+    // Check if device hardware location tracking services are active
+    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) {
+      if (mounted) {
+        setState(() {
+          _isLocationServiceDisabled = true;
+          _isLoadingLocation = false;
+        });
+      }
+      return;
+    }
 
     LocationPermission permission = await Geolocator.checkPermission();
-
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
     }
 
     if (permission == LocationPermission.denied ||
         permission == LocationPermission.deniedForever) {
+      if (mounted) {
+        setState(() => _isLoadingLocation = false);
+      }
       return;
     }
 
-    final position = await Geolocator.getCurrentPosition(
-      locationSettings: const LocationSettings(accuracy: LocationAccuracy.high),
-    );
+    try {
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
 
-    if (!mounted) return;
+      if (!mounted) return;
 
-    setState(() {
-      _currentPosition = position;
-    });
+      setState(() {
+        _currentPosition = position;
+        _isLoadingLocation = false;
+      });
 
-    _animatedMapController.animateTo(
-      dest: LatLng(position.latitude, position.longitude),
-      zoom: 16,
-    );
+      _animatedMapController.animateTo(
+        dest: LatLng(position.latitude, position.longitude),
+        zoom: 16,
+      );
 
-    _maybePushLocation(position);
-
-    _startGeneralPositionStream();
+      _maybePushLocation(position);
+      _startGeneralPositionStream();
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoadingLocation = false);
+      }
+    }
   }
 
   void _startGeneralPositionStream() {
@@ -341,34 +356,78 @@ void stopNavigation() {
           ),
         ).listen((position) {
           if (!mounted) return;
-
           setState(() {
             _currentPosition = position;
           });
-
           _maybePushLocation(position);
         });
+  }
+
+  void _onLocationSelected(LatLng destination, String label) async {
+    if (_currentPosition == null) return;
+
+    setState(() {
+      _isSearching = false;
+      _searchQuery = "";
+      _searchController.clear();
+    });
+
+    try {
+      final route = await _routeService.getRoute(
+        start: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+        end: destination,
+      );
+
+      setState(() {
+        _searchedLocation = destination;
+        _remainingRoute = List.from(route);
+        _completedRoute = [];
+      });
+
+      if (widget.rideDocumentId != null) {
+        await _rideService.updateDestination(
+          widget.rideDocumentId!,
+          destination: label,
+          latitude: destination.latitude,
+          longitude: destination.longitude,
+        );
+      }
+
+      _animatedMapController.animatedFitCamera(
+        cameraFit: CameraFit.bounds(
+          bounds: LatLngBounds.fromPoints(route),
+          padding: const EdgeInsets.all(60),
+        ),
+      );
+    } catch (e) {
+      debugPrint("Route building fallback error: $e");
+      setState(() {
+        _searchedLocation = destination;
+        _completedRoute = [];
+        _remainingRoute = [
+          LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+          destination,
+        ];
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    _positionSubscription?.cancel();
+    _navigationSubscription?.cancel();
+    _memberLocationsSubscription?.cancel();
+    _rideSubscription?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return GlassScaffold(
-      // floatingActionButton: FloatingActionButton.extended(
-      //   shape: Border.all(style: BorderStyle.solid),
-      //   backgroundColor: Colors.black,
-      //   foregroundColor: Colors.white,
-      //   onPressed: () {
-      //     if (_isNavigating) {
-      //       stopNavigation();
-      //     } else {
-      //       startNavigation();
-      //     }
-      //   },
-      //   icon: Icon(_isNavigating ? Icons.stop : Icons.navigation),
-      //   label: Text(_isNavigating ? "Stop" : "Start"),
-      // ),
       body: Stack(
         children: [
+          // Background Tile Engine Layer
           FlutterMap(
             mapController: _animatedMapController.mapController,
             options: const MapOptions(
@@ -381,287 +440,349 @@ void stopNavigation() {
                     'https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}',
                 additionalOptions: {
                   'accessToken': dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '',
-                  'id': 'mapbox/dark-v11',
+                  'id': isSatteliteMode
+                      ? 'mapbox/satellite-streets-v12'
+                      : 'mapbox/dark-v11',
                 },
                 tileDimension: 512,
                 zoomOffset: -1,
               ),
-
-              if (_currentPosition != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: LatLng(
-                        _currentPosition!.latitude,
-                        _currentPosition!.longitude,
-                      ),
-                      width: 120,
-                      height: 70,
-                      alignment: Alignment.topCenter,
-                      child: Builder(
-                        builder: (context) {
-                          final user = FirebaseAuth.instance.currentUser;
-
-                          final name =
-                              user?.displayName?.trim().isNotEmpty == true
-                              ? user!.displayName!
-                              : "You";
-
-                          return Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 7,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black87,
-                                  borderRadius: BorderRadius.circular(20),
-                                  border: Border.all(color: Colors.white24),
-                                  boxShadow: const [
-                                    BoxShadow(
-                                      color: Colors.black26,
-                                      blurRadius: 8,
-                                      offset: Offset(0, 3),
-                                    ),
-                                  ],
-                                ),
-                                child: Text(
-                                  name,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-
-                              const SizedBox(height: 4),
-
-                              Container(
-                                width: 18,
-                                height: 18,
-                                decoration: BoxDecoration(
-                                  color: Colors.orangeAccent,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: Colors.white,
-                                    width: 3,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ),
-                  ],
-                ),
-
-              if (_otherRiders.isNotEmpty)
-                MarkerLayer(
-                  markers: _otherRiders.map((rider) {
-                    return Marker(
-                      point: LatLng(rider.latitude!, rider.longitude!),
-                      width: 46,
-                      height: 56,
-                      child: _RiderMarker(rider: rider),
-                    );
-                  }).toList(),
-                ),
-
-              if (_searchedLocation != null)
-                MarkerLayer(
-                  markers: [
-                    Marker(
-                      point: _searchedLocation!,
-                      width: 45,
-                      height: 45,
-                      child: const Icon(
-                        Icons.location_on_outlined,
-                        color: Colors.red,
-                        size: 40,
-                      ),
-                    ),
-                  ],
-                ),
-
-              if (_completedRoute.isNotEmpty)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: _completedRoute,
-                      strokeWidth: 6,
-                      color: Colors.grey.shade700,
-                    ),
-                  ],
-                ),
-
-              if (_remainingRoute.isNotEmpty)
-                PolylineLayer(
-                  polylines: [
-                    Polyline(
-                      points: _remainingRoute,
-                      strokeWidth: 3,
-                      color: Colors.white,
-                    ),
-                  ],
-                ),
+              if (_currentPosition != null) _buildUserMarkerLayer(),
+              if (_otherRiders.isNotEmpty) _buildConvoyMarkerLayer(),
+              if (_searchedLocation != null) _buildDestinationMarkerLayer(),
+              if (_completedRoute.isNotEmpty) _buildCompletedRouteLayer(),
+              if (_remainingRoute.isNotEmpty) _buildRemainingRouteLayer(),
             ],
           ),
 
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
+          // Main Interactive Map Interfaces
+          if (!_isLoadingLocation && !_isLocationServiceDisabled)
+            SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 200),
+                      switchInCurve: Curves.easeInOut,
+                      switchOutCurve: Curves.easeInOut,
+                      transitionBuilder:
+                          (Widget child, Animation<double> animation) {
+                            return FadeTransition(
+                              opacity: animation,
+                              child: child,
+                            );
+                          },
+                      child: !_isSearching
+                          ? _buildHeaderCardRow()
+                          : InlineSearchBar(
+                              controller: _searchController,
+                              searchQuery: _searchQuery,
+                              onChanged: (val) =>
+                                  setState(() => _searchQuery = val),
+                              onCloseSearch: () => setState(() {
+                                _isSearching = false;
+                                _searchQuery = "";
+                                _searchController.clear();
+                              }),
+                            ),
+                    ),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.fastOutSlowIn,
+                      child: (_isSearching && _searchQuery.trim().length >= 2)
+                          ? Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: InlineSearchResults(
+                                searchQuery: _searchQuery,
+                                searchService: _searchService,
+                                onPlaceSelected: _onLocationSelected,
+                              ),
+                            )
+                          : const SizedBox(width: double.infinity, height: 0),
+                    ),
+                    const Spacer(),
+                    if (!_isSearching) _buildBottomControlsRow(),
+                  ],
+                ),
+              ),
+            ),
+
+          // Minimal High-Contrast Loading Overlay
+          if (_isLoadingLocation)
+            Container(
+              color: Colors.black,
+              child: const Center(
+                child: CircularProgressIndicator(
+                  color: Colors.white,
+                  strokeWidth: 2,
+                ),
+              ),
+            ),
+
+          // Minimal Turn On Location Request Screen (Pitch Black with White Layout controls)
+          if (_isLocationServiceDisabled)
+            Container(
+              color: Colors.black,
+              width: double.infinity,
+              height: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 32),
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: _RideInfoCard(
-                          rideDocumentId: widget.rideDocumentId,
-                          initialRide: widget.initialRide,
-                          rideService: _rideService,
+                  const Icon(
+                    CupertinoIcons.location_slash,
+                    color: Colors.white38,
+                    size: 44,
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    "Location Services Disabled",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    "Open Trail requires device system GPS access to calculate real-time navigation streams and manage team telemetry.",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 13,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        foregroundColor: Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
                       ),
-
-                      const SizedBox(width: 12),
-
-                     if (_currentRide?.leaderId == _rideService.currentUserId)
-                        GestureDetector(
-                          onTap: () async {
-                            final result =
-                                await showSearch<Map<String, dynamic>?>(
-                                  context: context,
-                                  delegate: LocationSearchDelegate(),
-                                );
-
-                            if (result == null) return;
-
-                            final coordinates =
-                                result['geometry']['coordinates'];
-
-                            final lon = (coordinates[0] as num).toDouble();
-                            final lat = (coordinates[1] as num).toDouble();
-
-                            final destination = LatLng(lat, lon);
-
-                            if (_currentPosition == null) return;
-
-                            try {
-                              final route = await _routeService.getRoute(
-                                start: LatLng(
-                                  _currentPosition!.latitude,
-                                  _currentPosition!.longitude,
-                                ),
-                                end: destination,
-                              );
-
-                              setState(() {
-                                _searchedLocation = destination;
-                                _remainingRoute = List.from(route);
-                                _completedRoute = [];
-                              });
-
-                              if (widget.rideDocumentId != null) {
-                                await _rideService.updateDestination(
-                                  widget.rideDocumentId!,
-                                  destination:
-                                      result['place_name'] ?? 'Destination',
-                                  latitude: destination.latitude,
-                                  longitude: destination.longitude,
-                                );
-                              }
-
-                              _animatedMapController.animatedFitCamera(
-                                cameraFit: CameraFit.bounds(
-                                  bounds: LatLngBounds.fromPoints(route),
-                                  padding: const EdgeInsets.all(60),
-                                ),
-                              );
-                            } catch (e) {
-                              debugPrint("Route error: $e");
-
-                              setState(() {
-                                _searchedLocation = destination;
-                                _completedRoute = [];
-                                _remainingRoute = [
-                                  LatLng(
-                                    _currentPosition!.latitude,
-                                    _currentPosition!.longitude,
-                                  ),
-                                  destination,
-                                ];
-                              });
-
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text(
-                                    "Couldn't fetch route. Showing straight line instead.",
-                                  ),
-                                ),
-                              );
-                            }
-                          },
-                          child: Container(
-                            width: 57,
-                            height: 57,
-                            decoration: const BoxDecoration(
-                              color: Colors.black,
-                            ),
-                            child: const Center(
-                              child: Icon(
-                                Icons.search_outlined,
-                                color: Colors.white70,
-                              ),
-                            ),
-                          ),
+                      onPressed: () async {
+                        await Geolocator.openLocationSettings();
+                        _initializeLocation();
+                      },
+                      child: const Text(
+                        "Enable Location Services",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
                         ),
-                    ],
+                      ),
+                    ),
                   ),
-
-                  const Spacer(),
+                  const SizedBox(height: 16),
+                  TextButton(
+                    onPressed: _initializeLocation,
+                    child: const Text(
+                      "Retry Connection",
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
-          ),
-          if (_currentRide?.leaderId == _rideService.currentUserId)
-          Positioned(
-            bottom: 30,
-            right: 20,
-            child: Container(
-              width: 57,
-              height: 57,
-              decoration: BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.circular(50),
-              ),
-              child: IconButton(
-                icon: Icon(
-                  _isNavigating
-                      ? CupertinoIcons.stop_fill
-                      : CupertinoIcons.location_north_line,
-                  color: Colors.white70,
-                ),
-                onPressed: () {
-                  if (_isNavigating) {
-                    stopNavigation();
-                  } else {
-                    startNavigation();
-                  }
-                },
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
+
+  // --- Map Layer Helper Builders ---
+  Widget _buildUserMarkerLayer() {
+    return MarkerLayer(
+      markers: [
+        Marker(
+          point: LatLng(
+            _currentPosition!.latitude,
+            _currentPosition!.longitude,
+          ),
+          width: 120,
+          height: 70,
+          alignment: Alignment.topCenter,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white24),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 8,
+                      offset: Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Text(
+                  _cachedUserName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: Colors.orangeAccent,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 3),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  MarkerLayer _buildConvoyMarkerLayer() {
+    return MarkerLayer(
+      markers: _otherRiders.map((rider) {
+        return Marker(
+          point: LatLng(rider.latitude!, rider.longitude!),
+          width: 46,
+          height: 64,
+          child: _RiderMarker(rider: rider),
+        );
+      }).toList(),
+    );
+  }
+
+  MarkerLayer _buildDestinationMarkerLayer() {
+    return MarkerLayer(
+      markers: [
+        Marker(
+          point: _searchedLocation!,
+          width: 45,
+          height: 45,
+          child: const Icon(
+            Icons.location_on_outlined,
+            color: Colors.red,
+            size: 40,
+          ),
+        ),
+      ],
+    );
+  }
+
+  PolylineLayer _buildCompletedRouteLayer() {
+    return PolylineLayer(
+      polylines: [
+        Polyline(
+          points: _completedRoute,
+          strokeWidth: 6,
+          color: Colors.grey.shade700,
+        ),
+      ],
+    );
+  }
+
+  PolylineLayer _buildRemainingRouteLayer() {
+    return PolylineLayer(
+      polylines: [
+        Polyline(points: _remainingRoute, strokeWidth: 3, color: Colors.white),
+      ],
+    );
+  }
+
+  // --- UI Row Structural Builders ---
+  Widget _buildHeaderCardRow() {
+    return Row(
+      key: const ValueKey('info_card_row'),
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _RideInfoCard(
+            rideDocumentId: widget.rideDocumentId,
+            initialRide: widget.initialRide,
+            rideService: _rideService,
+          ),
+        ),
+        if (_currentRide?.leaderId == _rideService.currentUserId) ...[
+          const SizedBox(width: 12),
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _isSearching = true;
+              });
+            },
+            child: GlassCard(
+              useOwnLayer: true,
+              quality: GlassQuality.premium,
+              shape: LiquidRoundedRectangle(borderRadius: 50),
+              child: const Center(
+                child: Icon(Icons.search_outlined, color: Colors.white70),
+              ),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildBottomControlsRow() {
+    return Row(
+      children: [
+        GlassButton(
+          useOwnLayer: true,
+          quality: GlassQuality.premium,
+          icon: Icon(
+            isSatteliteMode ? Icons.dark_mode : Icons.light_mode,
+            color: Colors.white,
+          ),
+          onTap: () {
+            setState(() {
+              isSatteliteMode = !isSatteliteMode;
+            });
+          },
+        ),
+        const Spacer(),
+        if (_currentRide?.leaderId == _rideService.currentUserId)
+          GlassButton(
+            useOwnLayer: true,
+            quality: GlassQuality.premium,
+            icon: Icon(
+              _isNavigating
+                  ? CupertinoIcons.stop_fill
+                  : CupertinoIcons.location_north_fill,
+              color: Colors.white70,
+            ),
+            onTap: () {
+              if (_isNavigating) {
+                stopNavigation();
+              } else {
+                startNavigation();
+              }
+            },
+          ),
+      ],
+    );
+  }
 }
 
-/// A small pin showing a convoy member's initials + name label.
 class _RiderMarker extends StatelessWidget {
   const _RiderMarker({required this.rider});
 
@@ -741,11 +862,12 @@ class _RideInfoCard extends StatelessWidget {
       builder: (context, snapshot) {
         final ride = snapshot.data;
 
-        return Container(
-          height: 57,
+        return GlassCard(
           width: MediaQuery.of(context).size.width * 0.94,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          decoration: BoxDecoration(color: Colors.black),
+          shape: LiquidRoundedRectangle(borderRadius: 50),
+          quality: GlassQuality.premium,
+          useOwnLayer: true,
           child: _buildContent(context, snapshot, ride),
         );
       },
@@ -771,6 +893,7 @@ class _RideInfoCard extends StatelessWidget {
         child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
       );
     }
+
     return Stack(
       alignment: Alignment.center,
       children: [
