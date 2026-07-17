@@ -50,6 +50,18 @@ dependencies:
   geocoding: ^5.0.0
   flutter_map_animations: ^0.10.0
   liquid_glass_widgets: ^0.21.4
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: true
+
+  image_path: "assets/app_icon.png"
+
+  adaptive_icon_background: "#000000"
+  adaptive_icon_foreground: "assets/app_icon.png"
+
+  remove_alpha_ios: true
 
 dev_dependencies:
   flutter_test:

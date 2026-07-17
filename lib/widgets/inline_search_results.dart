@@ -23,6 +23,11 @@ class InlineSearchResults extends StatelessWidget {
       ),
       child: GlassCard(
         useOwnLayer: true,
+        settings: LiquidGlassSettings(
+          thickness: 15,
+          refractiveIndex: 15.12,
+          blur: 5,
+        ),
         quality: GlassQuality.premium,
         shape: LiquidRoundedRectangle(borderRadius: 15),
         padding: const EdgeInsets.symmetric(vertical: 4),

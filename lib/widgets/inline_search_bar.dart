@@ -20,6 +20,11 @@ class InlineSearchBar extends StatelessWidget {
     return GlassCard(
       useOwnLayer: true,
       quality: GlassQuality.premium,
+      settings: LiquidGlassSettings(
+        thickness: 15,
+        refractiveIndex: 15.12,
+        blur: 5,
+      ),
       shape: LiquidRoundedRectangle(borderRadius: 50),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       child: Row(

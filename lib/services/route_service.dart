@@ -4,9 +4,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 import 'package:latlong2/latlong.dart';
+import 'package:open_trail/models/navigation_route.dart';
+import 'package:open_trail/models/navigation_step.dart';
 
 class RouteService {
-  Future<List<LatLng>> getRoute({
+  Future<NavigationRoute> getRoute({
     required LatLng start,
     required LatLng end,
   }) async {
@@ -37,6 +39,8 @@ class RouteService {
         [start.longitude, start.latitude],
         [end.longitude, end.latitude],
       ],
+      "instructions": true,
+      "instructions_format": "text",
     };
 
     debugPrint(jsonEncode(body));
@@ -60,8 +64,24 @@ class RouteService {
 
     final List<dynamic> coords = data["features"][0]["geometry"]["coordinates"];
 
-    return coords.map<LatLng>((c) {
+    final segment = data["features"][0]["properties"]["segments"][0];
+
+    final steps = (segment["steps"] as List)
+        .map(
+          (step) => NavigationStep(
+            instruction: step["instruction"],
+            distance: (step["distance"] as num).toDouble(),
+            duration: (step["duration"] as num).toDouble(),
+            type: step["type"],
+            waypointIndex: step["way_points"][0],
+          ),
+        )
+        .toList();
+
+    final geometry = coords.map<LatLng>((c) {
       return LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble());
     }).toList();
+
+    return NavigationRoute(geometry: geometry, steps: steps);
   }
 }
