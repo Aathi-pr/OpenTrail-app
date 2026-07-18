@@ -51,6 +51,7 @@ dependencies:
   flutter_map_animations: ^0.10.0
   liquid_glass_widgets: ^0.21.4
   flutter_launcher_icons: ^0.14.4
+  flutter_compass: ^0.8.1
 
 flutter_launcher_icons:
   android: true
@@ -90,6 +91,7 @@ flutter:
     - assets/background.png
     - assets/g.png
     - assets/pin.png
+    - assets/bike.png
     - .env
   #   - images/a_dot_ham.jpeg
 

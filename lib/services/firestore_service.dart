@@ -16,6 +16,10 @@ class FirestoreService {
     defaultValue: '(default)',
   );
 
+  CollectionReference<Map<String, dynamic>> get usersCollection {
+    return _firestore.collection('users');
+  }
+
   CollectionReference<Map<String, dynamic>> get ridesCollection {
     return _firestore.collection('rides');
   }

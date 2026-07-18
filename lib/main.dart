@@ -9,16 +9,14 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   await dotenv.load(fileName: ".env");
-  await LiquidGlassWidgets.initialize(
-  );
+  await LiquidGlassWidgets.initialize();
 
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
 
     debugPrint(details.exceptionAsString());
   };
-  runApp(LiquidGlassWidgets.wrap(
-    child: const OpenTrail()));
+  runApp(LiquidGlassWidgets.wrap(child: const OpenTrail()));
 }
 
 class OpenTrail extends StatelessWidget {

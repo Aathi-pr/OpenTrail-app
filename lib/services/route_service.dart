@@ -82,6 +82,11 @@ class RouteService {
       return LatLng((c[1] as num).toDouble(), (c[0] as num).toDouble());
     }).toList();
 
-    return NavigationRoute(geometry: geometry, steps: steps);
+    return NavigationRoute(
+      geometry: geometry,
+      steps: steps,
+      distanceMeters: (segment["distance"] as num).toDouble(),
+      durationSeconds: (segment["duration"] as num).toDouble(),
+    );
   }
 }
