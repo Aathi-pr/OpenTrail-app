@@ -52,6 +52,7 @@ dependencies:
   liquid_glass_widgets: ^0.21.4
   flutter_launcher_icons: ^0.14.4
   flutter_compass: ^0.8.1
+  firebase_database: ^12.4.6
 
 flutter_launcher_icons:
   android: true

@@ -7,14 +7,15 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_animations/flutter_map_animations.dart';
-import 'package:flutter_map_location_marker/flutter_map_location_marker.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:open_trail/models/navigation_step.dart';
 import 'package:open_trail/models/ride_model.dart';
 import 'package:open_trail/models/rider_location_model.dart';
+import 'package:open_trail/services/live_location_service.dart';
 import 'package:open_trail/services/location_search_service.dart';
+import 'package:open_trail/services/navigation_service.dart';
 import 'package:open_trail/services/ride_service.dart';
 import 'package:open_trail/services/route_service.dart';
 import 'package:open_trail/widgets/inline_search_bar.dart';
@@ -37,8 +38,10 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   late final AnimatedMapController _animatedMapController;
   final RideService _rideService = RideService();
   final RouteService _routeService = RouteService();
+  late final NavigationService _navigationService;
   final LocationSearchService _searchService = LocationSearchService();
   final Map<String, List<LatLng>> _leaderRoutes = {};
+  final LiveLocationService _liveLocationService = LiveLocationService();
   bool get _isLeader => _currentRide?.leaderId == _rideService.currentUserId;
   int _leaderRouteRequestId = 0;
   bool _isLoadingLeaderRoutes = false;
@@ -68,6 +71,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   double? _remainingDurationSeconds;
   bool _isNavigating = false;
   bool _routeReceived = false;
+  bool _arrivalHandled = false;
 
   List<NavigationStep> _steps = [];
   int _currentStep = 0;
@@ -218,50 +222,6 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
 
     if (remainingMinutes == 0) return "$hours hr";
     return "$hours hr $remainingMinutes min";
-  }
-
-  double _polylineDistanceMeters(List<LatLng> points) {
-    if (points.length < 2) return 0;
-
-    final distance = const Distance();
-    var total = 0.0;
-
-    for (var i = 1; i < points.length; i++) {
-      total += distance.as(LengthUnit.Meter, points[i - 1], points[i]);
-    }
-
-    return total;
-  }
-
-  void _setRouteSummary({
-    required double distanceMeters,
-    required double durationSeconds,
-  }) {
-    _routeDistanceMeters = distanceMeters;
-    _routeDurationSeconds = durationSeconds;
-    _remainingDistanceMeters = distanceMeters;
-    _remainingDurationSeconds = durationSeconds;
-  }
-
-  void _updateRemainingRouteSummary(LatLng current) {
-    final routeDistance = _routeDistanceMeters;
-    final routeDuration = _routeDurationSeconds;
-
-    if (routeDistance == null || routeDuration == null) return;
-
-    final remainingDistance = _remainingRoute.isEmpty
-        ? const Distance().as(LengthUnit.Meter, current, _searchedLocation!)
-        : const Distance().as(
-                LengthUnit.Meter,
-                current,
-                _remainingRoute.first,
-              ) +
-              _polylineDistanceMeters(_remainingRoute);
-
-    _remainingDistanceMeters = remainingDistance;
-    _remainingDurationSeconds = routeDistance <= 0
-        ? routeDuration
-        : routeDuration * (remainingDistance / routeDistance).clamp(0.0, 1.0);
   }
 
   LatLng? get _leaderLatLng {
@@ -433,8 +393,6 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
 
   StreamSubscription<Position>? _positionSubscription;
-  StreamSubscription<Position>? _navigationSubscription;
-
   StreamSubscription<List<RiderLocationModel>>? _memberLocationsSubscription;
   List<RiderLocationModel> _otherRiders = [];
 
@@ -452,6 +410,9 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   void initState() {
     super.initState();
 
+    _navigationService = NavigationService(_routeService)
+      ..addListener(_handleNavigationStateChanged);
+
     _animatedMapController = AnimatedMapController(
       vsync: this,
       duration: const Duration(milliseconds: 250),
@@ -463,6 +424,73 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     _initializeLocation();
     _listenToConvoy();
     _listenToRide();
+  }
+
+  void _handleNavigationStateChanged() {
+    final navState = _navigationService.state;
+    if (!mounted || navState == null) return;
+
+    final previousStep = _currentStep;
+    final wasNavigating = _isNavigating;
+
+    setState(() {
+      if (navState.currentPosition != null) {
+        _currentPosition = navState.currentPosition;
+      }
+      _searchedLocation = navState.destination;
+      _remainingRoute = List.of(navState.remainingRoute);
+      _completedRoute = List.of(navState.completedRoute);
+      _remainingDistanceMeters = navState.remainingDistance;
+      _remainingDurationSeconds = navState.remainingDuration;
+      _routeDistanceMeters = navState.remainingDistance;
+      _routeDurationSeconds = navState.remainingDuration;
+      _isNavigating = navState.navigating;
+      _routeReceived = navState.remainingRoute.isNotEmpty;
+      _steps = List.of(navState.steps);
+      _currentStep = _steps.isEmpty
+          ? 0
+          : navState.currentStepIndex.clamp(0, _steps.length - 1).toInt();
+      _distanceToNextTurn = navState.distanceToNextStep;
+    });
+
+    if (navState.navigating) {
+      _animatedMapController.animateTo(
+        dest: navState.snappedLocation,
+        zoom: 18,
+      );
+
+      final gpsPosition = navState.currentPosition;
+      if (gpsPosition != null) {
+        _maybePushLocation(gpsPosition);
+      }
+      _scheduleLeaderRouteRefresh();
+    }
+
+    if (navState.navigating &&
+        (previousStep != _currentStep ||
+            (!wasNavigating && navState.steps.isNotEmpty) ||
+            (_distanceToNextTurn < 200 && !_showTurnBanner))) {
+      _showNavigationBanner();
+    }
+
+    if (navState.arrived && !_arrivalHandled) {
+      _arrivalHandled = true;
+      unawaited(_handleArrival());
+    }
+  }
+
+  Future<void> _handleArrival() async {
+    if (widget.rideDocumentId != null &&
+        widget.initialRide?.leaderId == _rideService.currentUserId) {
+      await _rideService.stopRideNavigation(widget.rideDocumentId!);
+    }
+
+    _startGeneralPositionStream();
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text("You've arrived")));
   }
 
   void _cacheUserProfile() {
@@ -486,8 +514,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
 
       if (!ride.isNavigating) {
         if (_isNavigating) {
-          _navigationSubscription?.cancel();
-          _navigationSubscription = null;
+          await _navigationService.stopNavigation();
 
           setState(() {
             _isNavigating = false;
@@ -513,43 +540,19 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
         ride.destinationLongitude!,
       );
 
-      try {
-        final route = await _routeService.getRoute(
-          start: LatLng(
-            _currentPosition!.latitude,
-            _currentPosition!.longitude,
-          ),
-          end: destination,
-        );
-
-        if (!mounted) return;
-
-        setState(() {
-          _searchedLocation = destination;
-          _remainingRoute = List.from(route.geometry);
-          _completedRoute = [];
-          _setRouteSummary(
-            distanceMeters: route.distanceMeters,
-            durationSeconds: route.durationSeconds,
-          );
-          _steps = route.steps;
-          _currentStep = 0;
-          _distanceToNextTurn = 0;
-        });
-
+      setState(() {
+        _searchedLocation = destination;
         _routeReceived = true;
-        await startNavigation();
-      } catch (e) {
-        debugPrint("Failed to build convoy route: $e");
-      }
+      });
+      await startNavigation();
     });
   }
 
   void _listenToConvoy() {
     if (widget.rideDocumentId == null) return;
 
-    _memberLocationsSubscription = _rideService
-        .watchMemberLocations(widget.rideDocumentId!)
+    _memberLocationsSubscription = _liveLocationService
+        .watchLocations(widget.rideDocumentId!)
         .listen(
           (riders) {
             if (!mounted) return;
@@ -589,14 +592,16 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     _lastPushedLatLng = current;
 
     try {
-      await _rideService.updateMemberLocation(
-        widget.rideDocumentId!,
-        latitude: position.latitude,
-        longitude: position.longitude,
-        heading: position.heading,
-        speed: position.speed,
+      await _liveLocationService.updateLocation(
+        rideId: widget.rideDocumentId!,
+        uid: FirebaseAuth.instance.currentUser!.uid,
+        displayName: _cachedUserName,
+        role: _isLeader ? "leader" : "member",
+        position: position,
       );
-    } catch (e) {}
+    } catch (e) {
+      debugPrint("Failed to push live location: $e");
+    }
   }
 
   Future<void> startNavigation() async {
@@ -607,10 +612,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
       return;
     }
 
-    setState(() {
-      _isNavigating = true;
-    });
-    _showNavigationBanner();
+    _arrivalHandled = false;
 
     if (widget.rideDocumentId != null &&
         widget.initialRide?.leaderId == _rideService.currentUserId) {
@@ -619,85 +621,28 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
 
     await _positionSubscription?.cancel();
     _positionSubscription = null;
-    await _navigationSubscription?.cancel();
 
-    _navigationSubscription =
-        Geolocator.getPositionStream(
-          locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.bestForNavigation,
-            distanceFilter: 3,
-          ),
-        ).listen((position) async {
-          if (!mounted) return;
-
-          final current = LatLng(position.latitude, position.longitude);
-          const distance = Distance();
-
-          if (_remainingRoute.isNotEmpty) {
-            while (_remainingRoute.length > 1 &&
-                distance(current, _remainingRoute.first) < 15) {
-              _completedRoute.add(_remainingRoute.removeAt(0));
-            }
-            setState(() {});
-          }
-
-          setState(() {
-            _currentPosition = position;
-            _updateRemainingRouteSummary(current);
-
-            if (_steps.isNotEmpty && _currentStep < _steps.length) {
-              final waypoint = _steps[_currentStep].waypointIndex;
-
-              if (waypoint >= 0 && waypoint < _remainingRoute.length) {
-                _distanceToNextTurn = const Distance().as(
-                  LengthUnit.Meter,
-                  current,
-                  _remainingRoute[waypoint],
-                );
-
-                if (_distanceToNextTurn < 20 &&
-                    _currentStep < _steps.length - 1) {
-                  _currentStep++;
-                  _showNavigationBanner();
-                } else if (_distanceToNextTurn < 200 && !_showTurnBanner) {
-                  _showNavigationBanner();
-                }
-              }
-            }
-          });
-
-          _animatedMapController.animateTo(dest: current, zoom: 18);
-          _maybePushLocation(position);
-          _scheduleLeaderRouteRefresh();
-
-          final remainingDistance = const Distance().as(
-            LengthUnit.Meter,
-            current,
-            _searchedLocation!,
-          );
-
-          if (remainingDistance < 20) {
-            setState(() {
-              _remainingDistanceMeters = 0;
-              _remainingDurationSeconds = 0;
-            });
-            stopNavigation();
-            if (!mounted) return;
-            ScaffoldMessenger.of(
-              context,
-            ).showSnackBar(const SnackBar(content: Text("You've arrived 🎉")));
-            return;
-          }
-        }, onError: (e) {});
+    try {
+      await _navigationService.startNavigation(
+        start: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+        destination: _searchedLocation!,
+      );
+    } catch (e) {
+      debugPrint("Failed to start navigation: $e");
+      if (!mounted) return;
+      setState(() {
+        _isNavigating = false;
+        _routeReceived = false;
+      });
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Unable to start route.")));
+      _startGeneralPositionStream();
+    }
   }
 
-  void stopNavigation() {
-    _navigationSubscription?.cancel();
-    _navigationSubscription = null;
-
-    setState(() {
-      _isNavigating = false;
-    });
+  Future<void> stopNavigation() async {
+    await _navigationService.stopNavigation();
 
     if (widget.rideDocumentId != null &&
         widget.initialRide?.leaderId == _rideService.currentUserId) {
@@ -747,6 +692,15 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
 
       if (!mounted) return;
 
+      final user = FirebaseAuth.instance.currentUser;
+
+      if (widget.rideDocumentId != null && user != null) {
+        await _liveLocationService.enableDisconnectRemoval(
+          rideId: widget.rideDocumentId!,
+          uid: user.uid,
+        );
+      }
+
       setState(() {
         _currentPosition = position;
         _isLoadingLocation = false;
@@ -779,14 +733,21 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     _positionSubscription =
         Geolocator.getPositionStream(
           locationSettings: const LocationSettings(
-            accuracy: LocationAccuracy.high,
-            distanceFilter: 5,
+            accuracy: LocationAccuracy.bestForNavigation,
+            distanceFilter: 3,
           ),
         ).listen((position) {
+          debugPrint(
+            "GPS: ${position.latitude}, ${position.longitude} "
+            "accuracy=${position.accuracy}m",
+          );
+
           if (!mounted) return;
+
           setState(() {
             _currentPosition = position;
           });
+
           _maybePushLocation(position);
           _scheduleLeaderRouteRefresh();
         });
@@ -800,24 +761,15 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     }
 
     try {
-      final route = await _routeService.getRoute(
+      await _navigationService.previewRoute(
         start: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-        end: destination,
+        destination: destination,
       );
 
       if (!mounted) return;
 
       setState(() {
         _searchedLocation = destination;
-        _remainingRoute = List.from(route.geometry);
-        _completedRoute = [];
-        _setRouteSummary(
-          distanceMeters: route.distanceMeters,
-          durationSeconds: route.durationSeconds,
-        );
-        _steps = route.steps;
-        _currentStep = 0;
-        _distanceToNextTurn = 0;
       });
 
       if (widget.rideDocumentId != null) {
@@ -833,30 +785,18 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
 
       _animatedMapController.animatedFitCamera(
         cameraFit: CameraFit.bounds(
-          bounds: LatLngBounds.fromPoints(route.geometry),
+          bounds: LatLngBounds.fromPoints(
+            _navigationService.state?.remainingRoute ?? [destination],
+          ),
           padding: const EdgeInsets.all(60),
         ),
       );
     } catch (e) {
       debugPrint("Route building fallback error: $e");
-      final fallbackDistance = const Distance().as(
-        LengthUnit.Meter,
-        LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-        destination,
-      );
-
-      setState(() {
-        _searchedLocation = destination;
-        _completedRoute = [];
-        _remainingRoute = [
-          LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-          destination,
-        ];
-        _setRouteSummary(
-          distanceMeters: fallbackDistance,
-          durationSeconds: fallbackDistance / 13.9,
-        );
-      });
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Unable to build route.")));
     }
   }
 
@@ -865,7 +805,8 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     _persistState();
     _searchController.dispose();
     _positionSubscription?.cancel();
-    _navigationSubscription?.cancel();
+    _navigationService.removeListener(_handleNavigationStateChanged);
+    _navigationService.dispose();
     _memberLocationsSubscription?.cancel();
     _rideSubscription?.cancel();
     _turnBannerTimer?.cancel();
@@ -1136,13 +1077,19 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   }
 
   Widget _buildUserMarkerLayer() {
+    final navState = _navigationService.state;
+
+    final markerPoint = navState?.currentPosition != null
+        ? LatLng(
+            navState!.currentPosition!.latitude,
+            navState.currentPosition!.longitude,
+          )
+        : LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
+
     return MarkerLayer(
       markers: [
         Marker(
-          point: LatLng(
-            _currentPosition!.latitude,
-            _currentPosition!.longitude,
-          ),
+          point: markerPoint,
           width: 120,
           height: 70,
           alignment: Alignment.topCenter,
@@ -1367,13 +1314,15 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
           quality: GlassQuality.premium,
           icon: Icon(Icons.gps_fixed, color: Colors.white),
           onTap: () {
-            _animatedMapController.animateTo(
-              dest: LatLng(
-                _currentPosition!.latitude,
-                _currentPosition!.longitude,
-              ),
-              zoom: 18,
-            );
+            final navState = _navigationService.state;
+            final target = navState?.navigating == true
+                ? navState!.snappedLocation
+                : LatLng(
+                    _currentPosition!.latitude,
+                    _currentPosition!.longitude,
+                  );
+
+            _animatedMapController.animateTo(dest: target, zoom: 18);
           },
         ),
       ],
@@ -1396,8 +1345,15 @@ class _RiderMarker extends StatelessWidget {
         .toUpperCase();
   }
 
-  Color get _color =>
-      rider.role == 'leader' ? Colors.orangeAccent : Colors.lightBlueAccent;
+  Color get _color {
+    if (!rider.isOnline) {
+      return Colors.grey;
+    }
+
+    return rider.role == 'leader'
+        ? Colors.orangeAccent
+        : Colors.lightBlueAccent;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1412,13 +1368,23 @@ class _RiderMarker extends StatelessWidget {
           ),
 
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Text(
-            rider.displayName,
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                rider.displayName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 13,
+                ),
+              ),
+
+              if (!rider.isOnline) ...[
+                const SizedBox(width: 6),
+                const Icon(Icons.cloud_off, color: Colors.redAccent, size: 14),
+              ],
+            ],
           ),
         ),
         const SizedBox(height: 4),
@@ -1431,7 +1397,7 @@ class _RiderMarker extends StatelessWidget {
             border: Border.all(color: Colors.white, width: 3),
             boxShadow: [
               BoxShadow(
-                color: _color.withOpacity(.45),
+                color: _color.withValues(alpha: .45),
                 blurRadius: 10,
                 spreadRadius: 2,
               ),

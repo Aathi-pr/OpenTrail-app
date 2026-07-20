@@ -73,7 +73,7 @@ class RouteService {
             distance: (step["distance"] as num).toDouble(),
             duration: (step["duration"] as num).toDouble(),
             type: step["type"],
-            waypointIndex: step["way_points"][0],
+            waypointIndex: step["way_points"][1],
           ),
         )
         .toList();
