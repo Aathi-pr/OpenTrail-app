@@ -16,22 +16,34 @@ class AuthService {
     );
   }
 
+  User? get currentUser => _auth.currentUser;
+
+  String? get currentUserPhotoUrl {
+    final photoUrl = _auth.currentUser?.photoURL;
+    if (photoUrl == null) return null;
+
+    return photoUrl.contains('=s96-c')
+        ? photoUrl.replaceAll('=s96-c', '=s400-c')
+        : photoUrl;
+  }
+
   Future<User?> signInWithGoogle() async {
     try {
-      final GoogleSignInAccount googleUser = await _googleSignIn.authenticate();
+      final GoogleSignInAccount googleUser =
+          await _googleSignIn.authenticate();
 
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth = googleUser.authentication;
 
       final credential = GoogleAuthProvider.credential(
         idToken: googleAuth.idToken,
       );
 
       final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user;
 
-      return userCredential.user;
+
+      return user;
     } catch (e) {
-      print("Google Sign-In Error: $e");
       return null;
     }
   }

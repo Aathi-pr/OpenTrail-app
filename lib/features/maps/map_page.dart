@@ -18,6 +18,7 @@ import 'package:open_trail/services/location_search_service.dart';
 import 'package:open_trail/services/navigation_service.dart';
 import 'package:open_trail/services/ride_service.dart';
 import 'package:open_trail/services/route_service.dart';
+import 'package:open_trail/widgets/group_sheet/group_sheet.dart';
 import 'package:open_trail/widgets/inline_search_bar.dart';
 import 'package:open_trail/widgets/inline_search_results.dart';
 import 'package:open_trail/widgets/route_summary_card.dart';
@@ -1222,6 +1223,16 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
             rideDocumentId: widget.rideDocumentId,
             initialRide: widget.initialRide,
             rideService: _rideService,
+            distance: _routeDistanceLabel,
+            duration: _routeDurationLabel,
+            ridersStream: widget.rideDocumentId != null
+                ? _liveLocationService.watchLocations(widget.rideDocumentId!)
+                : const Stream.empty(),
+            riders: _otherRiders,
+            currentUserName: _cachedUserName,
+            currentUserId: _rideService.currentUserId!,
+            isLeader: _isLeader,
+            isNavigating: _isNavigating,
           ),
         ),
         if (_currentRide?.leaderId == _rideService.currentUserId) ...[
@@ -1414,11 +1425,29 @@ class _RideInfoCard extends StatelessWidget {
     required this.rideDocumentId,
     required this.initialRide,
     required this.rideService,
+    required this.distance,
+    required this.duration,
+    required this.ridersStream,
+    required this.riders,
+    required this.currentUserName,
+    required this.currentUserId,
+    required this.isLeader,
+    required this.isNavigating,
   });
 
   final String? rideDocumentId;
   final RideModel? initialRide;
   final RideService rideService;
+
+  final String distance;
+  final String duration;
+
+  final Stream<List<RiderLocationModel>> ridersStream;
+  final List<RiderLocationModel> riders;
+  final String currentUserName;
+  final String currentUserId;
+  final bool isLeader;
+  final bool isNavigating;
 
   @override
   Widget build(BuildContext context) {
@@ -1480,14 +1509,31 @@ class _RideInfoCard extends StatelessWidget {
                 padding: EdgeInsets.only(right: 16.0, top: 4.0, bottom: 4.0),
                 child: Icon(
                   Icons.arrow_back_ios_new,
-                  color: Colors.white,
+                  color: Colors.black,
                   size: 20,
                 ),
               ),
             ),
             GestureDetector(
               onTap: () {
-                debugPrint('Group icon tapped');
+                showModalBottomSheet(
+                  context: context,
+                  useSafeArea: true,
+                  backgroundColor: Colors.transparent,
+                  isScrollControlled: true,
+                  builder: (context) {
+                    return GroupSheet(
+                      ride: ride,
+                      distance: distance,
+                      duration: duration,
+                      ridersStream: ridersStream,
+                      currentUserName: currentUserName,
+                      currentUserId: currentUserId,
+                      isLeader: isLeader,
+                      isNavigating: isNavigating,
+                    );
+                  },
+                );
               },
               child: Row(
                 mainAxisSize: MainAxisSize.min,

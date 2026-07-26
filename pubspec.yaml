@@ -53,6 +53,8 @@ dependencies:
   flutter_launcher_icons: ^0.14.4
   flutter_compass: ^0.8.1
   firebase_database: ^12.4.6
+  qr_flutter: ^4.1.0
+  font_awesome_flutter: ^11.0.0
 
 flutter_launcher_icons:
   android: true
