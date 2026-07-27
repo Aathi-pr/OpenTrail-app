@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
-import '../services/location_search_service.dart';
 
 class InlineSearchResults extends StatelessWidget {
-  final String searchQuery;
-  final LocationSearchService searchService;
+  final List<dynamic> places;
+  final bool isLoading;
   final Function(LatLng coordinates, String locationLabel) onPlaceSelected;
 
   const InlineSearchResults({
     super.key,
-    required this.searchQuery,
-    required this.searchService,
+    required this.places,
+    required this.isLoading,
     required this.onPlaceSelected,
   });
 
@@ -31,10 +30,9 @@ class InlineSearchResults extends StatelessWidget {
         quality: GlassQuality.premium,
         shape: LiquidRoundedRectangle(borderRadius: 15),
         padding: const EdgeInsets.symmetric(vertical: 4),
-        child: FutureBuilder<List<dynamic>>(
-          future: searchService.searchPlaces(searchQuery),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+        child: Builder(
+          builder: (context) {
+            if (isLoading) {
               return const SizedBox(
                 height: 120,
                 child: Center(
@@ -46,23 +44,18 @@ class InlineSearchResults extends StatelessWidget {
               );
             }
 
-            if (snapshot.hasError ||
-                !snapshot.hasData ||
-                snapshot.data!.isEmpty) {
-              return Padding(
-                padding: const EdgeInsets.all(20),
+            if (places.isEmpty) {
+              return const SizedBox(
+                height: 120,
                 child: Center(
                   child: Text(
-                    snapshot.hasError
-                        ? snapshot.error.toString()
-                        : "No locations found",
-                    style: const TextStyle(color: Colors.white38),
+                    "No locations found",
+                    style: TextStyle(color: Colors.white38),
                   ),
                 ),
               );
             }
 
-            final places = snapshot.data!;
             return ListView.separated(
               shrinkWrap: true,
               physics: const BouncingScrollPhysics(),
@@ -70,21 +63,63 @@ class InlineSearchResults extends StatelessWidget {
               separatorBuilder: (_, __) =>
                   const Divider(color: Colors.white10, height: 1),
               itemBuilder: (context, index) {
-                final place = places[index];
-                final properties = place['properties'] ?? {};
-                final label = properties['label'] ?? 'Unknown location';
+                final place = places[index] as Map<String, dynamic>;
+
+                final properties = place['properties'] as Map<String, dynamic>;
+
+                final coordinates =
+                    properties['coordinates'] as Map<String, dynamic>;
+
+                final title =
+                    (properties['name'] ??
+                            properties['full_address'] ??
+                            'Unknown Location')
+                        .toString();
+
+                final subtitle =
+                    (properties['full_address'] ??
+                            properties['place_formatted'] ??
+                            '')
+                        .toString();
+
+                final lat = (coordinates['latitude'] as num).toDouble();
+
+                final lon = (coordinates['longitude'] as num).toDouble();
+
+                final featureType = (properties['feature_type'] ?? '')
+                    .toString();
+
+                IconData icon;
+
+                switch (featureType) {
+                  case 'poi':
+                    icon = Icons.place_outlined;
+                    break;
+
+                  case 'address':
+                    icon = Icons.home_outlined;
+                    break;
+
+                  case 'street':
+                    icon = Icons.route_outlined;
+                    break;
+
+                  case 'place':
+                    icon = Icons.location_city_outlined;
+                    break;
+
+                  default:
+                    icon = Icons.location_on_outlined;
+                }
 
                 return ListTile(
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 4,
                   ),
-                  leading: const Icon(
-                    Icons.location_on_outlined,
-                    color: Colors.white70,
-                  ),
+                  leading: Icon(icon, color: Colors.white70),
                   title: Text(
-                    label,
+                    title,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
@@ -94,14 +129,13 @@ class InlineSearchResults extends StatelessWidget {
                     ),
                   ),
                   subtitle: Text(
-                    properties['country'] ?? '',
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(color: Colors.white38, fontSize: 12),
                   ),
                   onTap: () {
-                    final coordinates = place['geometry']['coordinates'];
-                    final lon = (coordinates[0] as num).toDouble();
-                    final lat = (coordinates[1] as num).toDouble();
-                    onPlaceSelected(LatLng(lat, lon), label);
+                    onPlaceSelected(LatLng(lat, lon), title);
                   },
                 );
               },

@@ -1,6 +1,4 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:open_trail/models/ride_model.dart';
 
 class RideInformationSection extends StatelessWidget {
@@ -15,52 +13,30 @@ class RideInformationSection extends StatelessWidget {
 
   final RideModel ride;
   final String destination;
-  // final String distance;
-  // final String duration;
   final String leaderName;
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      useOwnLayer: true,
-
-      quality: GlassQuality.premium,
-
-      settings: LiquidGlassSettings(
-        thickness: 15,
-
-        blur: 2,
-
-        refractiveIndex: 15.12,
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.black,
+        borderRadius: BorderRadius.circular(1)
       ),
-
-      shape: LiquidRoundedRectangle(borderRadius: 24),
-
       padding: const EdgeInsets.all(18),
-
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
 
         children: [
           const Text(
             "Ride Information",
-
             style: TextStyle(
               color: Colors.white,
-
               fontSize: 18,
-
               fontWeight: FontWeight.w700,
             ),
           ),
 
           const SizedBox(height: 20),
-
-          // _InfoRow(title: "Destination", value: ride.destination),
-
-          // _InfoRow(title: "Remaining", value: distance),
-
-          // _InfoRow(title: "ETA", value: duration),
 
           _InfoRow(title: "Ride Code", value: ride.rideId),
 
@@ -68,7 +44,6 @@ class RideInformationSection extends StatelessWidget {
 
           _InfoRow(
             title: "Status",
-
             value: ride.isNavigating ? "Navigating" : "Waiting",
           ),
         ],

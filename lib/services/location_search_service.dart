@@ -1,31 +1,61 @@
 import 'dart:convert';
-import 'package:flutter/material.dart';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
 class LocationSearchService {
-  Future<List<dynamic>> searchPlaces(String query) async {
+  Future<List<dynamic>> searchPlaces(
+    String query, {
+    double? latitude,
+    double? longitude,
+  }) async {
     if (query.trim().length < 2) return [];
 
-    final apiKey = dotenv.env['GEOCODE_EARTH_API_KEY'];
-    if (apiKey == null || apiKey.isEmpty) {
-      debugPrint("❌ GEOCODE_EARTH_API_KEY not found.");
+    final token = dotenv.env['MAPBOX_ACCESS_TOKEN'];
+
+    if (token == null || token.isEmpty) {
+      debugPrint("MAPBOX_ACCESS_TOKEN not found.");
       return [];
     }
 
-    final uri = Uri.https('api.geocode.earth', '/v1/autocomplete', {
-      'text': query,
-      'api_key': apiKey,
-      'size': '10',
-    });
+    final params = <String, String>{
+      'q': query,
+      'access_token': token,
+      'limit': '10',
+      'language': 'en',
+      'types': 'poi,address,street,place',
+      'auto_complete': 'true',
+      'country': 'IN',
+    };
+
+    if (latitude != null && longitude != null) {
+      params['proximity'] = '$longitude,$latitude';
+    }
+
+    final uri = Uri.https(
+      'api.mapbox.com',
+      '/search/searchbox/v1/forward',
+      params,
+    );
+
+    debugPrint(uri.toString());
 
     try {
       final response = await http.get(uri);
-      if (response.statusCode != 200) return [];
+
+      debugPrint("Status: ${response.statusCode}");
+      debugPrint(response.body);
+
+      if (response.statusCode != 200) {
+        return [];
+      }
+
       final json = jsonDecode(response.body);
-      return json['features'] as List<dynamic>;
+
+      return List<dynamic>.from(json['features'] ?? []);
     } catch (e) {
-      debugPrint("Search network error: $e");
+      debugPrint("Search Error: $e");
       return [];
     }
   }

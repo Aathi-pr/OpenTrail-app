@@ -36,7 +36,7 @@ class OpentrailButton extends StatelessWidget {
   final String subtitle;
   final VoidCallback? onTap;
 
-  const OpentrailButton({
+  const OpentrailButton({super.key, 
     required this.number,
     required this.title,
     required this.subtitle,

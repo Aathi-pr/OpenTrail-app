@@ -55,6 +55,12 @@ dependencies:
   firebase_database: ^12.4.6
   qr_flutter: ^4.1.0
   font_awesome_flutter: ^11.0.0
+  flutter_bloc: ^9.1.0
+  equatable: ^2.0.7
+  get_it: ^8.0.3
+  google_maps_flutter: ^2.18.0
+  # mapbox_maps_flutter: ^2.27.0
+  # maplibre_gl: ^0.26.2
 
 flutter_launcher_icons:
   android: true

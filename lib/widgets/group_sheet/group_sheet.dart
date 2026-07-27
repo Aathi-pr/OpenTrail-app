@@ -3,7 +3,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:open_trail/auth/auth_service.dart';
 import 'package:open_trail/models/ride_model.dart';
 import 'package:open_trail/models/rider_location_model.dart';
@@ -14,7 +13,7 @@ class GroupSheet extends StatefulWidget {
     required this.ride,
     required this.distance,
     required this.duration,
-    required this.ridersStream,
+    required this.riders,
     required this.currentUserName,
     required this.currentUserId,
     required this.isLeader,
@@ -24,7 +23,7 @@ class GroupSheet extends StatefulWidget {
   final RideModel ride;
   final String distance;
   final String duration;
-  final Stream<List<RiderLocationModel>> ridersStream;
+  final List<RiderLocationModel> riders;
   final String currentUserName;
   final String currentUserId;
   final bool isNavigating;
@@ -37,7 +36,7 @@ class GroupSheet extends StatefulWidget {
 class _GroupSheetState extends State<GroupSheet> {
   final AuthService _authService = AuthService();
 
-List<RiderLocationModel> _getNormalizedRidersList(
+  List<RiderLocationModel> _getNormalizedRidersList(
     List<RiderLocationModel> riders,
   ) {
     final list = List<RiderLocationModel>.from(riders);
@@ -75,22 +74,11 @@ List<RiderLocationModel> _getNormalizedRidersList(
       minChildSize: 0.35,
       maxChildSize: 0.92,
       builder: (context, controller) {
-        return GlassContainer(
-          useOwnLayer: true,
-          quality: GlassQuality.premium,
-          shape: const LiquidRoundedRectangle(borderRadius: 32),
-          settings: const LiquidGlassSettings(
-            blur: 24,
-            thickness: 35,
-            chromaticAberration: 0.2,
-          ),
-          // StreamBuilder handles real-time updates automatically!
-          child: StreamBuilder<List<RiderLocationModel>>(
-            stream: widget.ridersStream,
-            initialData: const [],
-            builder: (context, snapshot) {
-              final rawRiders = snapshot.data ?? [];
-              final effectiveRiders = _getNormalizedRidersList(rawRiders);
+        return Container(
+          decoration: BoxDecoration(color: Colors.black),
+          child: Builder(
+            builder: (context) {
+              final effectiveRiders = _getNormalizedRidersList(widget.riders);
 
               return ListView(
                 controller: controller,
@@ -127,8 +115,8 @@ List<RiderLocationModel> _getNormalizedRidersList(
                           vertical: 4,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.white.withValues(alpha: 0.08),
-                          borderRadius: BorderRadius.circular(20),
+                          color: Colors.black,
+                          borderRadius: BorderRadius.circular(1),
                           border: Border.all(
                             color: Colors.white.withValues(alpha: 0.15),
                           ),
@@ -178,7 +166,7 @@ List<RiderLocationModel> _getNormalizedRidersList(
                           IconButton(
                             visualDensity: VisualDensity.compact,
                             icon: Icon(
-                              CupertinoIcons.square_on_square,
+                              CupertinoIcons.qrcode,
                               color: Colors.white.withValues(alpha: 0.8),
                               size: 20,
                             ),
@@ -194,14 +182,16 @@ List<RiderLocationModel> _getNormalizedRidersList(
                           IconButton(
                             visualDensity: VisualDensity.compact,
                             icon: Icon(
-                              CupertinoIcons.share,
+                              CupertinoIcons.square_on_square,
                               color: Colors.white.withValues(alpha: 0.8),
                               size: 20,
                             ),
                             onPressed: () {
                               Clipboard.setData(ClipboardData(text: joinLink));
                               ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(content: Text("Join link copied")),
+                                const SnackBar(
+                                  content: Text("Join link copied"),
+                                ),
                               );
                             },
                           ),
@@ -211,7 +201,10 @@ List<RiderLocationModel> _getNormalizedRidersList(
                   ),
 
                   const SizedBox(height: 12),
-                  Divider(color: Colors.white.withValues(alpha: 0.1), height: 1),
+                  Divider(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    height: 1,
+                  ),
                   const SizedBox(height: 18),
 
                   Row(
@@ -239,15 +232,7 @@ List<RiderLocationModel> _getNormalizedRidersList(
 
                   const SizedBox(height: 12),
 
-                  if (snapshot.connectionState == ConnectionState.waiting &&
-                      effectiveRiders.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Center(
-                        child: CupertinoActivityIndicator(color: Colors.white70),
-                      ),
-                    )
-                  else if (effectiveRiders.isEmpty)
+                  if (effectiveRiders.isEmpty)
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 20),
                       child: Center(
@@ -264,6 +249,7 @@ List<RiderLocationModel> _getNormalizedRidersList(
                     ...effectiveRiders.map((rider) {
                       final isLeaderRole =
                           rider.role.toLowerCase().trim() == "leader";
+
                       return _WireframeMemberTile(
                         rider: rider,
                         isLeader: isLeaderRole,
@@ -301,7 +287,7 @@ List<RiderLocationModel> _getNormalizedRidersList(
                       alignment: Alignment.center,
                       decoration: BoxDecoration(
                         color: Colors.redAccent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(1),
                         border: Border.all(
                           color: Colors.redAccent.withValues(alpha: 0.25),
                         ),
@@ -327,7 +313,6 @@ List<RiderLocationModel> _getNormalizedRidersList(
   }
 }
 
-// Subwidgets remain unchanged (_WireframeMemberTag, _WireframeMetricCard)
 class _WireframeMemberTile extends StatelessWidget {
   const _WireframeMemberTile({required this.rider, required this.isLeader});
 
@@ -343,7 +328,7 @@ class _WireframeMemberTile extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(1),
         border: Border.all(
           color: isLeader
               ? Colors.amber.withValues(alpha: 0.25)
@@ -352,7 +337,6 @@ class _WireframeMemberTile extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Circular Google Profile Picture with Online Status Badge Overlay
           Stack(
             children: [
               Container(
@@ -377,7 +361,6 @@ class _WireframeMemberTile extends StatelessWidget {
                 ),
               ),
 
-              // Online / Offline Indicator Badge
               Positioned(
                 right: 0,
                 bottom: 0,
@@ -388,7 +371,7 @@ class _WireframeMemberTile extends StatelessWidget {
                     color: rider.isOnline ? Colors.greenAccent : Colors.grey,
                     shape: BoxShape.circle,
                     border: Border.all(
-                      color: const Color(0xFF1E1E1E), // Background color match
+                      color: const Color(0xFF1E1E1E),
                       width: 1.5,
                     ),
                     boxShadow: rider.isOnline
@@ -408,7 +391,6 @@ class _WireframeMemberTile extends StatelessWidget {
 
           const SizedBox(width: 14),
 
-          // Display Name & Online Status Subtitle
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -439,8 +421,6 @@ class _WireframeMemberTile extends StatelessWidget {
               ],
             ),
           ),
-
-          // Leader Badge / Crown Icon
           if (isLeader)
             const FaIcon(FontAwesomeIcons.crown, color: Colors.amber, size: 16),
         ],
@@ -475,7 +455,7 @@ class _WireframeMetricCard extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(1),
         border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(

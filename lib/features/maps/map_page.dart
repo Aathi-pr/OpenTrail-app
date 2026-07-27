@@ -4,12 +4,15 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_map_animations/flutter_map_animations.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:open_trail/features/maps/widgets/floating_control_bar.dart';
+import 'package:open_trail/features/maps/widgets/map_view.dart';
+import 'package:open_trail/features/maps/widgets/navigation_banner.dart';
+import 'package:open_trail/features/maps/widgets/ride_info_card.dart';
 import 'package:open_trail/models/navigation_step.dart';
 import 'package:open_trail/models/ride_model.dart';
 import 'package:open_trail/models/rider_location_model.dart';
@@ -18,10 +21,8 @@ import 'package:open_trail/services/location_search_service.dart';
 import 'package:open_trail/services/navigation_service.dart';
 import 'package:open_trail/services/ride_service.dart';
 import 'package:open_trail/services/route_service.dart';
-import 'package:open_trail/widgets/group_sheet/group_sheet.dart';
 import 'package:open_trail/widgets/inline_search_bar.dart';
 import 'package:open_trail/widgets/inline_search_results.dart';
-import 'package:open_trail/widgets/route_summary_card.dart';
 
 class MapPage extends StatefulWidget {
   const MapPage({super.key, this.rideDocumentId, this.initialRide});
@@ -40,7 +41,6 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   final RideService _rideService = RideService();
   final RouteService _routeService = RouteService();
   late final NavigationService _navigationService;
-  final LocationSearchService _searchService = LocationSearchService();
   final Map<String, List<LatLng>> _leaderRoutes = {};
   final LiveLocationService _liveLocationService = LiveLocationService();
   bool get _isLeader => _currentRide?.leaderId == _rideService.currentUserId;
@@ -80,6 +80,52 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   bool _showTurnBanner = true;
   Timer? _turnBannerTimer;
 
+  Timer? _searchDebounce;
+  final LocationSearchService _locationSearchService = LocationSearchService();
+  List<dynamic> _searchResults = [];
+  bool _showSearch = false;
+  bool _isSearching = false;
+  String _searchQuery = "";
+
+  late final Stream<List<RiderLocationModel>> _ridersStream;
+  List<RiderLocationModel> _allRiders = [];
+  List<RiderLocationModel> _otherRiders = [];
+
+  Future<void> _performSearch(String query) async {
+    _searchDebounce?.cancel();
+
+    if (query.trim().isEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+      });
+      return;
+    }
+
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
+      if (!mounted) return;
+
+      setState(() {
+        _isSearching = true;
+      });
+
+      final results = await _locationSearchService.searchPlaces(
+        query,
+        latitude: _currentPosition?.latitude,
+        longitude: _currentPosition?.longitude,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _searchResults = results;
+        _isSearching = false;
+      });
+    });
+  }
+
   String get _stateCacheKey => widget.rideDocumentId ?? '__standalone_map__';
 
   void _showNavigationBanner() {
@@ -112,9 +158,13 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   void _closeSearch() {
     FocusManager.instance.primaryFocus?.unfocus();
 
+    _searchDebounce?.cancel();
+
     setState(() {
+      _showSearch = false;
       _isSearching = false;
       _searchQuery = "";
+      _searchResults = [];
       _searchController.clear();
     });
 
@@ -149,7 +199,6 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     _isSearching = snapshot.isSearching;
     _searchQuery = snapshot.searchQuery;
     _searchController.text = snapshot.searchQuery;
-    _otherRiders = List.of(snapshot.otherRiders);
     _leaderRoutes
       ..clear()
       ..addEntries(
@@ -157,6 +206,8 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
           (entry) => MapEntry(entry.key, List<LatLng>.of(entry.value)),
         ),
       );
+    _allRiders = List.of(snapshot.allRiders);
+    _otherRiders = List.of(snapshot.otherRiders);
   }
 
   void _persistState() {
@@ -194,6 +245,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
         for (final entry in _leaderRoutes.entries)
           entry.key: List<LatLng>.of(entry.value),
       },
+      allRiders: List.of(_allRiders),
     );
   }
 
@@ -389,13 +441,10 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     }
   }
 
-  bool _isSearching = false;
-  String _searchQuery = "";
   final TextEditingController _searchController = TextEditingController();
 
   StreamSubscription<Position>? _positionSubscription;
   StreamSubscription<List<RiderLocationModel>>? _memberLocationsSubscription;
-  List<RiderLocationModel> _otherRiders = [];
 
   DateTime? _lastLocationPushAt;
   LatLng? _lastPushedLatLng;
@@ -411,6 +460,12 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   void initState() {
     super.initState();
 
+    if (widget.rideDocumentId != null) {
+      _ridersStream = _liveLocationService.watchLocations(
+        widget.rideDocumentId!,
+      );
+    }
+
     _navigationService = NavigationService(_routeService)
       ..addListener(_handleNavigationStateChanged);
 
@@ -421,6 +476,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     );
 
     _cacheUserProfile();
+    _currentRide = widget.initialRide;
     _restoreCachedState();
     _initializeLocation();
     _listenToConvoy();
@@ -481,8 +537,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   }
 
   Future<void> _handleArrival() async {
-    if (widget.rideDocumentId != null &&
-        widget.initialRide?.leaderId == _rideService.currentUserId) {
+    if (widget.rideDocumentId != null && _isLeader) {
       await _rideService.stopRideNavigation(widget.rideDocumentId!);
     }
 
@@ -509,7 +564,9 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     ) async {
       if (!mounted || ride == null) return;
 
-      _currentRide = ride;
+      setState(() {
+        _currentRide = ride;
+      });
 
       if (ride.leaderId == _rideService.currentUserId) return;
 
@@ -517,11 +574,13 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
         if (_isNavigating) {
           await _navigationService.stopNavigation();
 
+          if (!mounted) return;
+
           setState(() {
             _isNavigating = false;
+            _routeReceived = false;
           });
 
-          _routeReceived = false;
           _startGeneralPositionStream();
         }
         return;
@@ -541,10 +600,13 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
         ride.destinationLongitude!,
       );
 
+      if (!mounted) return;
+
       setState(() {
         _searchedLocation = destination;
         _routeReceived = true;
       });
+
       await startNavigation();
     });
   }
@@ -552,24 +614,26 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   void _listenToConvoy() {
     if (widget.rideDocumentId == null) return;
 
-    _memberLocationsSubscription = _liveLocationService
-        .watchLocations(widget.rideDocumentId!)
-        .listen(
-          (riders) {
-            if (!mounted) return;
-            final selfId = _rideService.currentUserId;
-            setState(() {
-              _otherRiders = riders
-                  .where((r) => r.userId != selfId && r.hasLocation)
-                  .toList();
-            });
+    _memberLocationsSubscription = _ridersStream.listen(
+      (riders) {
+        if (!mounted) return;
 
-            _scheduleLeaderRouteRefresh();
-          },
-          onError: (e) {
-            debugPrint("Convoy stream error: $e");
-          },
-        );
+        final selfId = _rideService.currentUserId;
+
+        setState(() {
+          _allRiders = riders;
+
+          _otherRiders = riders
+              .where((r) => r.userId != selfId && r.hasLocation)
+              .toList();
+        });
+
+        _scheduleLeaderRouteRefresh();
+      },
+      onError: (e) {
+        debugPrint("Convoy stream error: $e");
+      },
+    );
   }
 
   Future<void> _maybePushLocation(Position position) async {
@@ -615,8 +679,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
 
     _arrivalHandled = false;
 
-    if (widget.rideDocumentId != null &&
-        widget.initialRide?.leaderId == _rideService.currentUserId) {
+    if (widget.rideDocumentId != null && _isLeader) {
       await _rideService.startRideNavigation(widget.rideDocumentId!);
     }
 
@@ -645,8 +708,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   Future<void> stopNavigation() async {
     await _navigationService.stopNavigation();
 
-    if (widget.rideDocumentId != null &&
-        widget.initialRide?.leaderId == _rideService.currentUserId) {
+    if (widget.rideDocumentId != null && _isLeader) {
       _rideService.stopRideNavigation(widget.rideDocumentId!);
     }
 
@@ -757,7 +819,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   void _onLocationSelected(LatLng destination, String label) async {
     if (_currentPosition == null) return;
 
-    if (_isSearching) {
+    if (_showSearch) {
       _closeSearch();
     }
 
@@ -770,7 +832,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
       if (!mounted) return;
 
       setState(() {
-        _searchedLocation = destination;
+        _searchResults = [];
       });
 
       if (widget.rideDocumentId != null) {
@@ -784,17 +846,35 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
 
       if (!mounted) return;
 
-      _animatedMapController.animatedFitCamera(
-        cameraFit: CameraFit.bounds(
-          bounds: LatLngBounds.fromPoints(
-            _navigationService.state?.remainingRoute ?? [destination],
-          ),
-          padding: const EdgeInsets.all(60),
-        ),
+      final routePoints = List<LatLng>.from(
+        _navigationService.state?.remainingRoute ?? [],
       );
-    } catch (e) {
-      debugPrint("Route building fallback error: $e");
+
+      // Remove any invalid coordinates.
+      routePoints.removeWhere(
+        (point) => !point.latitude.isFinite || !point.longitude.isFinite,
+      );
+
+      if (routePoints.isEmpty) {
+        routePoints.add(destination);
+      }
+
+      if (routePoints.length == 1) {
+        _animatedMapController.animateTo(dest: routePoints.first, zoom: 16);
+      } else {
+        _animatedMapController.animatedFitCamera(
+          cameraFit: CameraFit.bounds(
+            bounds: LatLngBounds.fromPoints(routePoints),
+            padding: const EdgeInsets.all(60),
+          ),
+        );
+      }
+    } catch (e, stackTrace) {
+      debugPrint("Route building error: $e");
+      debugPrintStack(stackTrace: stackTrace);
+
       if (!mounted) return;
+
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(const SnackBar(content: Text("Unable to build route.")));
@@ -812,47 +892,41 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     _rideSubscription?.cancel();
     _turnBannerTimer?.cancel();
     _leaderRouteRefreshTimer?.cancel();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentUserId = _rideService.currentUserId;
+    if (currentUserId == null) {
+      return const SizedBox.shrink();
+    }
     return PopScope(
-      canPop: !_isSearching,
+      canPop: !_showSearch,
+
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _isSearching) {
+        if (!didPop && _showSearch) {
           _closeSearch();
         }
       },
       child: GlassScaffold(
         body: Stack(
           children: [
-            FlutterMap(
+            MapView(
               mapController: _animatedMapController.mapController,
-              options: MapOptions(
-                initialCenter: _initialMapCenter,
-                initialZoom: _initialMapZoom,
-              ),
-              children: [
-                TileLayer(
-                  urlTemplate:
-                      'https://api.mapbox.com/styles/v1/{id}/tiles/{z}/{x}/{y}?access_token={accessToken}',
-                  additionalOptions: {
-                    'accessToken': dotenv.env['MAPBOX_ACCESS_TOKEN'] ?? '',
-                    'id': isSatteliteMode
-                        ? 'mapbox/satellite-streets-v12'
-                        : 'mapbox/dark-v11',
-                  },
-                  tileDimension: 512,
-                  zoomOffset: -1,
-                ),
-                if (_currentPosition != null) _buildUserMarkerLayer(),
-                if (_otherRiders.isNotEmpty) _buildConvoyMarkerLayer(),
-                if (_searchedLocation != null) _buildDestinationMarkerLayer(),
-                if (_completedRoute.isNotEmpty) _buildCompletedRouteLayer(),
-                if (_remainingRoute.isNotEmpty) _buildRemainingRouteLayer(),
-                if (_leaderRoutes.isNotEmpty) _buildLeaderRoutes(),
-              ],
+              initialCenter: _initialMapCenter,
+              initialZoom: _initialMapZoom,
+              isSatelliteMode: isSatteliteMode,
+              currentPosition: _currentPosition,
+              navigationPosition: _navigationService.state?.currentPosition,
+              searchedLocation: _searchedLocation,
+              completedRoute: _completedRoute,
+              remainingRoute: _remainingRoute,
+              otherRiders: _otherRiders,
+              leaderRoutes: _leaderRoutes,
+              cachedUserName: _cachedUserName,
+              isLeader: _isLeader,
             ),
 
             if (!_isLoadingLocation && !_isLocationServiceDisabled)
@@ -861,133 +935,165 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
                   padding: const EdgeInsets.all(16),
                   child: Column(
                     children: [
-                      AnimatedSwitcher(
-                        duration: const Duration(milliseconds: 200),
-                        switchInCurve: Curves.easeInOut,
-                        switchOutCurve: Curves.easeInOut,
-                        transitionBuilder:
-                            (Widget child, Animation<double> animation) {
-                              return FadeTransition(
-                                opacity: animation,
-                                child: child,
-                              );
-                            },
-                        child: !_isSearching
-                            ? _buildHeaderCardRow()
-                            : InlineSearchBar(
-                                controller: _searchController,
-                                searchQuery: _searchQuery,
-                                onChanged: (val) =>
-                                    setState(() => _searchQuery = val),
-                                onCloseSearch: _closeSearch,
+                      SizedBox(
+                        height: 72,
+                        child: Stack(
+                          alignment: Alignment.topCenter,
+                          children: [
+                            AnimatedOpacity(
+                              opacity: _showSearch ? 0 : 1,
+                              duration: const Duration(milliseconds: 200),
+                              child: IgnorePointer(
+                                ignoring: _showSearch,
+                                child: RideInfoCard(
+                                  ride: _currentRide,
+                                  distance: _routeDistanceLabel,
+                                  duration: _routeDurationLabel,
+                                  riders: _allRiders,
+                                  currentUserName: _cachedUserName,
+                                  currentUserId: currentUserId,
+                                  isLeader: _isLeader,
+                                  isNavigating: _isNavigating,
+                                ),
                               ),
+                            ),
+
+                            AnimatedOpacity(
+                              opacity: _showSearch ? 1 : 0,
+                              duration: const Duration(milliseconds: 200),
+                              child: IgnorePointer(
+                                ignoring: !_showSearch,
+                                child: InlineSearchBar(
+                                  controller: _searchController,
+                                  searchQuery: _searchQuery,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _searchQuery = value;
+                                    });
+                                    _performSearch(value);
+                                  },
+                                  onCloseSearch: _closeSearch,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                       AnimatedSwitcher(
                         duration: const Duration(milliseconds: 300),
-                        child:
-                            (_isNavigating &&
-                                !_isSearching &&
-                                _steps.isNotEmpty &&
-                                _showTurnBanner)
-                            ? Padding(
-                                padding: const EdgeInsets.only(top: 10),
-                                child: GlassCard(
-                                  useOwnLayer: true,
-                                  quality: GlassQuality.premium,
-                                  settings: LiquidGlassSettings(
-                                    thickness: 15,
-                                    blur: 2,
-                                    refractiveIndex: 15.12,
-                                  ),
-                                  shape: LiquidRoundedRectangle(
-                                    borderRadius: 20,
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                    vertical: 14,
-                                  ),
-                                  child: Row(
-                                    children: [
-                                      // Turn Icon
-                                      SizedBox(
-                                        width: 36,
-                                        child: Icon(
-                                          iconForType(
-                                            _steps[_currentStep].type,
-                                          ),
-                                          color: Colors.white,
-                                          size: 24,
-                                        ),
-                                      ),
-
-                                      const SizedBox(width: 12),
-
-                                      // Instruction
-                                      Expanded(
-                                        child: Text(
-                                          _steps[_currentStep].instruction,
-                                          textAlign: TextAlign.center,
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 16,
-                                            fontWeight: FontWeight.w600,
-                                            letterSpacing: -0.2,
-                                          ),
-                                        ),
-                                      ),
-
-                                      const SizedBox(width: 12),
-
-                                      // Distance
-                                      SizedBox(
-                                        width: 65,
-                                        child: Text(
-                                          "${_distanceToNextTurn.round()} m",
-                                          textAlign: TextAlign.end,
-                                          style: const TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              )
-                            : const SizedBox.shrink(),
+                        child: NavigationBanner(
+                          key: const ValueKey('navigation_banner'),
+                          isVisible:
+                              _isNavigating &&
+                              !_isSearching &&
+                              _steps.isNotEmpty &&
+                              _showTurnBanner,
+                          step: _steps.isEmpty ? null : _steps[_currentStep],
+                          distanceToNextTurn: _distanceToNextTurn,
+                        ),
                       ),
                       AnimatedSwitcher(
                         duration: const Duration(milliseconds: 250),
-                        child: (_hasRouteSummary && !_isSearching)
+                        child: (_hasRouteSummary && !_showSearch)
                             ? Padding(
                                 key: const ValueKey('route_summary_card'),
                                 padding: const EdgeInsets.only(top: 10),
-                                child: RouteSummaryCard(
-                                  distance: _routeDistanceLabel,
-                                  duration: _routeDurationLabel,
-                                ),
+                                // child: RouteSummaryCard(
+                                //   distance: _routeDistanceLabel,
+                                //   duration: _routeDurationLabel,
+                                // ),
                               )
                             : const SizedBox.shrink(),
                       ),
                       AnimatedSize(
                         duration: const Duration(milliseconds: 300),
                         curve: Curves.fastOutSlowIn,
-                        child: (_isSearching && _searchQuery.trim().length >= 2)
+                        child: (_showSearch && _searchQuery.trim().length >= 2)
                             ? Padding(
                                 padding: const EdgeInsets.only(top: 10),
                                 child: InlineSearchResults(
-                                  searchQuery: _searchQuery,
-                                  searchService: _searchService,
+                                  places: _searchResults,
+                                  isLoading: _isSearching,
                                   onPlaceSelected: _onLocationSelected,
                                 ),
                               )
                             : const SizedBox(width: double.infinity, height: 0),
                       ),
+
                       const Spacer(),
-                      if (!_isSearching) _buildBottomControlsRow(),
+
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 300),
+                        switchInCurve: Curves.easeOutCubic,
+                        switchOutCurve: Curves.easeInCubic,
+                        transitionBuilder: (child, animation) {
+                          return FadeTransition(
+                            opacity: animation,
+                            child: ScaleTransition(
+                              scale: Tween<double>(
+                                begin: 0.9,
+                                end: 1.0,
+                              ).animate(animation),
+                              child: child,
+                            ),
+                          );
+                        },
+                        child: !_showSearch
+                            ? FloatingControlBar(
+                                key: const ValueKey('floating_toolbar'),
+                                isSatelliteMode: isSatteliteMode,
+                                isNavigating: _isNavigating,
+
+                                onSearch: () async {
+                                  await HapticFeedback.mediumImpact();
+
+                                  setState(() {
+                                    _showSearch = true;
+                                  });
+                                },
+
+                                onToggleSatellite: () async {
+                                  await HapticFeedback.mediumImpact();
+
+                                  setState(() {
+                                    isSatteliteMode = !isSatteliteMode;
+                                  });
+                                },
+
+                                onNavigation: () async {
+                                  await HapticFeedback.heavyImpact();
+
+                                  if (_isNavigating) {
+                                    await stopNavigation();
+                                  } else {
+                                    await startNavigation();
+                                  }
+                                },
+
+                                onCenterLocation: () async {
+                                  await HapticFeedback.heavyImpact();
+
+                                  if (_currentPosition == null) return;
+
+                                  final navState = _navigationService.state;
+
+                                  final target = navState?.navigating == true
+                                      ? navState!.snappedLocation
+                                      : LatLng(
+                                          _currentPosition!.latitude,
+                                          _currentPosition!.longitude,
+                                        );
+
+                                  _animatedMapController.animateTo(
+                                    dest: target,
+                                    zoom: 18,
+                                  );
+                                },
+                              )
+                            : const SizedBox.shrink(
+                                key: ValueKey('empty_toolbar'),
+                              ),
+                      ),
                     ],
                   ),
                 ),
@@ -1057,6 +1163,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
                         label: "Turn on Location",
                         shape: LiquidRoundedRectangle(borderRadius: 50),
                         onTap: () async {
+                          await HapticFeedback.heavyImpact();
                           await Geolocator.openLocationSettings();
                           _initializeLocation();
                         },
@@ -1074,534 +1181,6 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
           ],
         ),
       ),
-    );
-  }
-
-  Widget _buildUserMarkerLayer() {
-    final navState = _navigationService.state;
-
-    final markerPoint = navState?.currentPosition != null
-        ? LatLng(
-            navState!.currentPosition!.latitude,
-            navState.currentPosition!.longitude,
-          )
-        : LatLng(_currentPosition!.latitude, _currentPosition!.longitude);
-
-    return MarkerLayer(
-      markers: [
-        Marker(
-          point: markerPoint,
-          width: 120,
-          height: 70,
-          alignment: Alignment.topCenter,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: Colors.black87,
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white24),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Colors.black26,
-                      blurRadius: 8,
-                      offset: Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Text(
-                  _cachedUserName,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 13,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Container(
-                width: 18,
-                height: 18,
-                decoration: BoxDecoration(
-                  color: _isLeader
-                      ? Colors.orangeAccent
-                      : Colors.lightBlueAccent,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 3),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  MarkerLayer _buildConvoyMarkerLayer() {
-    return MarkerLayer(
-      markers: _otherRiders.map((rider) {
-        return Marker(
-          point: LatLng(rider.latitude!, rider.longitude!),
-          width: (rider.displayName.length * 11 + 32)
-              .clamp(120, 280)
-              .toDouble(),
-          height: 60,
-          alignment: Alignment.topCenter,
-          child: _RiderMarker(rider: rider),
-        );
-      }).toList(),
-    );
-  }
-
-  MarkerLayer _buildDestinationMarkerLayer() {
-    return MarkerLayer(
-      markers: [
-        Marker(
-          point: _searchedLocation!,
-          width: 45,
-          height: 45,
-          child: const Icon(
-            Icons.location_on_outlined,
-            color: Colors.red,
-            size: 40,
-          ),
-        ),
-      ],
-    );
-  }
-
-  PolylineLayer _buildLeaderRoutes() {
-    return PolylineLayer(
-      polylines: _leaderRoutes.values.map((points) {
-        return Polyline(
-          points: points,
-          strokeWidth: 4,
-          color: Colors.lightBlueAccent,
-          borderStrokeWidth: 2,
-          borderColor: Colors.black54,
-          pattern: StrokePattern.dashed(
-            segments: const [14, 10],
-            patternFit: PatternFit.extendFinalDash,
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  PolylineLayer _buildCompletedRouteLayer() {
-    return PolylineLayer(
-      polylines: [
-        Polyline(
-          points: _completedRoute,
-          strokeWidth: 6,
-          color: Colors.grey.shade700,
-        ),
-      ],
-    );
-  }
-
-  PolylineLayer _buildRemainingRouteLayer() {
-    return PolylineLayer(
-      polylines: [
-        Polyline(points: _remainingRoute, strokeWidth: 3, color: Colors.white),
-      ],
-    );
-  }
-
-  Widget _buildHeaderCardRow() {
-    return Row(
-      key: const ValueKey('info_card_row'),
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _RideInfoCard(
-            rideDocumentId: widget.rideDocumentId,
-            initialRide: widget.initialRide,
-            rideService: _rideService,
-            distance: _routeDistanceLabel,
-            duration: _routeDurationLabel,
-            ridersStream: widget.rideDocumentId != null
-                ? _liveLocationService.watchLocations(widget.rideDocumentId!)
-                : const Stream.empty(),
-            riders: _otherRiders,
-            currentUserName: _cachedUserName,
-            currentUserId: _rideService.currentUserId!,
-            isLeader: _isLeader,
-            isNavigating: _isNavigating,
-          ),
-        ),
-        if (_currentRide?.leaderId == _rideService.currentUserId) ...[
-          const SizedBox(width: 12),
-          GestureDetector(
-            onTap: () {
-              setState(() {
-                _isSearching = true;
-              });
-            },
-            child: GlassCard(
-              useOwnLayer: true,
-              settings: LiquidGlassSettings(
-                thickness: 15,
-                refractiveIndex: 15.12,
-                blur: 3,
-              ),
-              quality: GlassQuality.premium,
-              shape: LiquidRoundedRectangle(borderRadius: 50),
-              child: const Center(
-                child: Icon(Icons.search_outlined, color: Colors.white70),
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildBottomControlsRow() {
-    return Row(
-      children: [
-        GlassButton(
-          shape: LiquidRoundedRectangle(borderRadius: 50),
-          width: MediaQuery.of(context).size.width * 0.2,
-          useOwnLayer: true,
-          settings: LiquidGlassSettings(
-            thickness: 15,
-            refractiveIndex: 15.12,
-            blur: 2,
-          ),
-          quality: GlassQuality.premium,
-          icon: Icon(
-            isSatteliteMode ? Icons.layers : Icons.layers_outlined,
-            color: Colors.white,
-          ),
-          onTap: () {
-            setState(() {
-              isSatteliteMode = !isSatteliteMode;
-            });
-          },
-        ),
-        const Spacer(),
-        if (_currentRide?.leaderId == _rideService.currentUserId)
-          GlassButton(
-            shape: LiquidRoundedRectangle(borderRadius: 50),
-            width: MediaQuery.of(context).size.width * 0.4,
-            useOwnLayer: true,
-            settings: LiquidGlassSettings(
-              thickness: 15,
-              refractiveIndex: 15.12,
-              blur: 2,
-            ),
-            quality: GlassQuality.premium,
-            icon: Icon(
-              _isNavigating
-                  ? CupertinoIcons.stop_fill
-                  : CupertinoIcons.location_north_fill,
-              color: Colors.white70,
-            ),
-            onTap: () {
-              if (_isNavigating) {
-                stopNavigation();
-              } else {
-                startNavigation();
-              }
-            },
-          ),
-        Spacer(),
-
-        GlassButton(
-          shape: LiquidRoundedRectangle(borderRadius: 50),
-          width: MediaQuery.of(context).size.width * 0.2,
-          useOwnLayer: true,
-          settings: LiquidGlassSettings(
-            thickness: 15,
-            refractiveIndex: 15.12,
-            blur: 2,
-          ),
-          quality: GlassQuality.premium,
-          icon: Icon(Icons.gps_fixed, color: Colors.white),
-          onTap: () {
-            final navState = _navigationService.state;
-            final target = navState?.navigating == true
-                ? navState!.snappedLocation
-                : LatLng(
-                    _currentPosition!.latitude,
-                    _currentPosition!.longitude,
-                  );
-
-            _animatedMapController.animateTo(dest: target, zoom: 18);
-          },
-        ),
-      ],
-    );
-  }
-}
-
-class _RiderMarker extends StatelessWidget {
-  const _RiderMarker({required this.rider});
-
-  final RiderLocationModel rider;
-
-  // ignore: unused_element
-  String get _initials {
-    final trimmed = rider.displayName.trim();
-    if (trimmed.isEmpty) return '?';
-    final parts = trimmed.split(RegExp(r'\s+'));
-    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-    return (parts.first.substring(0, 1) + parts.last.substring(0, 1))
-        .toUpperCase();
-  }
-
-  Color get _color {
-    if (!rider.isOnline) {
-      return Colors.grey;
-    }
-
-    return rider.role == 'leader'
-        ? Colors.orangeAccent
-        : Colors.lightBlueAccent;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.black,
-            borderRadius: BorderRadius.circular(50),
-            border: BoxBorder.all(color: Colors.white30),
-          ),
-
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                rider.displayName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
-                ),
-              ),
-
-              if (!rider.isOnline) ...[
-                const SizedBox(width: 6),
-                const Icon(Icons.cloud_off, color: Colors.redAccent, size: 14),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          width: 18,
-          height: 18,
-          decoration: BoxDecoration(
-            color: _color,
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white, width: 3),
-            boxShadow: [
-              BoxShadow(
-                color: _color.withValues(alpha: .45),
-                blurRadius: 10,
-                spreadRadius: 2,
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _RideInfoCard extends StatelessWidget {
-  const _RideInfoCard({
-    required this.rideDocumentId,
-    required this.initialRide,
-    required this.rideService,
-    required this.distance,
-    required this.duration,
-    required this.ridersStream,
-    required this.riders,
-    required this.currentUserName,
-    required this.currentUserId,
-    required this.isLeader,
-    required this.isNavigating,
-  });
-
-  final String? rideDocumentId;
-  final RideModel? initialRide;
-  final RideService rideService;
-
-  final String distance;
-  final String duration;
-
-  final Stream<List<RiderLocationModel>> ridersStream;
-  final List<RiderLocationModel> riders;
-  final String currentUserName;
-  final String currentUserId;
-  final bool isLeader;
-  final bool isNavigating;
-
-  @override
-  Widget build(BuildContext context) {
-    if (rideDocumentId == null) return const SizedBox.shrink();
-
-    return StreamBuilder<RideModel?>(
-      stream: rideService.watchRide(rideDocumentId!),
-      initialData: initialRide,
-      builder: (context, snapshot) {
-        final ride = snapshot.data;
-
-        return GlassCard(
-          width: MediaQuery.of(context).size.width * 0.94,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          shape: LiquidRoundedRectangle(borderRadius: 50),
-          quality: GlassQuality.premium,
-          useOwnLayer: true,
-          settings: LiquidGlassSettings(
-            thickness: 15,
-            refractiveIndex: 15.12,
-            blur: 2,
-          ),
-          child: _buildContent(context, snapshot, ride),
-        );
-      },
-    );
-  }
-
-  Widget _buildContent(
-    BuildContext context,
-    AsyncSnapshot<RideModel?> snapshot,
-    RideModel? ride,
-  ) {
-    if (snapshot.hasError) {
-      return Center(
-        child: Text(
-          'Error: ${snapshot.error}',
-          style: const TextStyle(color: Colors.redAccent, fontSize: 13),
-        ),
-      );
-    }
-
-    if (ride == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-      );
-    }
-
-    return Stack(
-      alignment: Alignment.center,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              child: const Padding(
-                padding: EdgeInsets.only(right: 16.0, top: 4.0, bottom: 4.0),
-                child: Icon(
-                  Icons.arrow_back_ios_new,
-                  color: Colors.black,
-                  size: 20,
-                ),
-              ),
-            ),
-            GestureDetector(
-              onTap: () {
-                showModalBottomSheet(
-                  context: context,
-                  useSafeArea: true,
-                  backgroundColor: Colors.transparent,
-                  isScrollControlled: true,
-                  builder: (context) {
-                    return GroupSheet(
-                      ride: ride,
-                      distance: distance,
-                      duration: duration,
-                      ridersStream: ridersStream,
-                      currentUserName: currentUserName,
-                      currentUserId: currentUserId,
-                      isLeader: isLeader,
-                      isNavigating: isNavigating,
-                    );
-                  },
-                );
-              },
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    width: 5,
-                    height: 5,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  const Icon(
-                    Icons.people_outline,
-                    color: Colors.white,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${ride.memberCount}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        GestureDetector(
-          onTap: () {
-            Clipboard.setData(ClipboardData(text: ride.rideId));
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Ride ID copied to clipboard'),
-                duration: Duration(seconds: 2),
-              ),
-            );
-          },
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'TAP TO COPY',
-                style: TextStyle(
-                  color: Colors.white54,
-                  fontSize: 10,
-                  letterSpacing: 2.5,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                ride.rideId,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 15,
-                  letterSpacing: 1.5,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }
@@ -1629,6 +1208,7 @@ class _MapPageSnapshot {
     required this.searchQuery,
     required this.otherRiders,
     required this.leaderRoutes,
+    required this.allRiders,
   });
 
   final RideModel? currentRide;
@@ -1652,44 +1232,5 @@ class _MapPageSnapshot {
   final String searchQuery;
   final List<RiderLocationModel> otherRiders;
   final Map<String, List<LatLng>> leaderRoutes;
-}
-
-IconData iconForType(int type) {
-  switch (type) {
-    case 0:
-      return Icons.turn_left;
-
-    case 1:
-      return Icons.turn_right;
-
-    case 2:
-      return Icons.turn_sharp_left;
-
-    case 3:
-      return Icons.turn_sharp_right;
-
-    case 4:
-      return Icons.turn_slight_left;
-
-    case 5:
-      return Icons.turn_slight_right;
-
-    case 6:
-      return Icons.straight;
-
-    case 7:
-      return Icons.roundabout_right;
-
-    case 9:
-      return Icons.u_turn_left;
-
-    case 10:
-      return Icons.flag;
-
-    case 11:
-      return Icons.navigation;
-
-    default:
-      return Icons.navigation;
-  }
+  final List<RiderLocationModel> allRiders;
 }

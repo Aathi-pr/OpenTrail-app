@@ -8,7 +8,6 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     const bg = Color(0xFF0A0A0A);
     const fg = Color(0xFFF4F4F2);
-    const secondary = Color(0xFF8B8B8B);
     const border = Color(0xFF242424);
     const card = Color(0xFF111111);
 
