@@ -949,6 +949,8 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
                                   ride: _currentRide,
                                   distance: _routeDistanceLabel,
                                   duration: _routeDurationLabel,
+
+                                  navigationService: _navigationService,
                                   riders: _allRiders,
                                   currentUserName: _cachedUserName,
                                   currentUserId: currentUserId,

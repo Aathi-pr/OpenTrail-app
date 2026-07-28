@@ -58,9 +58,7 @@ dependencies:
   flutter_bloc: ^9.1.0
   equatable: ^2.0.7
   get_it: ^8.0.3
-  google_maps_flutter: ^2.18.0
-  # mapbox_maps_flutter: ^2.27.0
-  # maplibre_gl: ^0.26.2
+  flutter_svg: ^2.3.0
 
 flutter_launcher_icons:
   android: true
@@ -102,7 +100,6 @@ flutter:
     - assets/pin.png
     - assets/bike.png
     - .env
-  #   - images/a_dot_ham.jpeg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

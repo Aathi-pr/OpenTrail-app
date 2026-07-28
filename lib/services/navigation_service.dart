@@ -35,6 +35,20 @@ class NavigationService extends ChangeNotifier {
   NavigationState? get state => _state;
 
   bool get navigating => _state?.navigating ?? false;
+  double get totalDistance => _routeGeometryDistanceMeters;
+  double get completedDistance => _completedDistanceMeters;
+  double get totalDuration => _routeDurationSeconds;
+  double get remainingDistance => _state?.remainingDistance ?? 0;
+  double get remainingDuration => _state?.remainingDuration ?? 0;
+  double get currentSpeed => _state?.speed ?? 0;
+
+  double get progress {
+    if (_routeGeometryDistanceMeters <= 0) return 0;
+    return (_completedDistanceMeters / _routeGeometryDistanceMeters).clamp(
+      0.0,
+      1.0,
+    );
+  }
 
   Future<void> previewRoute({
     required LatLng start,
@@ -110,8 +124,7 @@ class NavigationService extends ChangeNotifier {
 
     debugPrint('Offset : ${projection.distanceMeters.toStringAsFixed(1)} m');
     final offRoute =
-        _distanceFromRoute(rawLocation, _fullRoute) >
-        _offRouteDistanceMeters;
+        _distanceFromRoute(rawLocation, _fullRoute) > _offRouteDistanceMeters;
 
     if (offRoute) {
       _setState(
@@ -290,7 +303,11 @@ class NavigationService extends ChangeNotifier {
     {
       final completedRoute = <LatLng>[];
 
-      for (var i = 0; i <= projection.segmentIndex && i < _fullRoute.length; i++) {
+      for (
+        var i = 0;
+        i <= projection.segmentIndex && i < _fullRoute.length;
+        i++
+      ) {
         _appendIfSeparated(completedRoute, _fullRoute[i]);
       }
       _appendIfSeparated(completedRoute, projection.point);

@@ -6,6 +6,9 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:open_trail/auth/auth_service.dart';
 import 'package:open_trail/models/ride_model.dart';
 import 'package:open_trail/models/rider_location_model.dart';
+import 'package:open_trail/services/navigation_service.dart';
+import 'package:open_trail/widgets/group_sheet/ride_progress_card.dart';
+import 'package:open_trail/widgets/group_sheet/ride_summary_grid.dart';
 
 class GroupSheet extends StatefulWidget {
   const GroupSheet({
@@ -13,6 +16,8 @@ class GroupSheet extends StatefulWidget {
     required this.ride,
     required this.distance,
     required this.duration,
+
+    required this.navigationService,
     required this.riders,
     required this.currentUserName,
     required this.currentUserId,
@@ -21,8 +26,10 @@ class GroupSheet extends StatefulWidget {
   });
 
   final RideModel ride;
+  final NavigationService navigationService;
   final String distance;
   final String duration;
+
   final List<RiderLocationModel> riders;
   final String currentUserName;
   final String currentUserId;
@@ -207,6 +214,80 @@ class _GroupSheetState extends State<GroupSheet> {
                   ),
                   const SizedBox(height: 18),
 
+                  const Text(
+                    "SUMMARY",
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  AnimatedBuilder(
+                    animation: widget.navigationService,
+                    builder: (context, child) {
+                      return RideSummaryGrid(
+                        distance: widget.distance,
+                        duration: widget.duration,
+                        averageSpeed:
+                            "${widget.navigationService.currentSpeed.toStringAsFixed(1)} km/h",
+                        onlineRiders: widget.riders
+                            .where((r) => r.isOnline)
+                            .length,
+                        totalRiders: widget.riders.length,
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 28),
+
+                  Divider(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    height: 1,
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  const Text(
+                    "PROGRESS",
+                    style: TextStyle(
+                      color: Colors.white54,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  AnimatedBuilder(
+                    animation: widget.navigationService,
+                    builder: (context, child) {
+                      return RideProgressCard(
+                        progress: widget.navigationService.progress,
+                        completedDistance:
+                            widget.navigationService.completedDistance,
+                        totalDistance: widget.navigationService.totalDistance,
+                        remainingDistance:
+                            widget.navigationService.remainingDistance,
+                        remainingDuration:
+                            widget.navigationService.remainingDuration,
+                      );
+                    },
+                  ),
+
+                  const SizedBox(height: 24),
+
+                  Divider(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    height: 1,
+                  ),
+
+                  const SizedBox(height: 12),
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -256,27 +337,7 @@ class _GroupSheetState extends State<GroupSheet> {
                       );
                     }),
 
-                  const SizedBox(height: 24),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _WireframeMetricCard(
-                          title: "DISTANCE",
-                          value: widget.distance,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: _WireframeMetricCard(
-                          title: "TIME",
-                          value: widget.duration,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 12),
 
                   GestureDetector(
                     onTap: () {
@@ -437,49 +498,6 @@ class _WireframeMemberTile extends StatelessWidget {
           size: 18,
           color: isLeader ? Colors.amber : Colors.white.withValues(alpha: 0.7),
         ),
-      ),
-    );
-  }
-}
-
-class _WireframeMetricCard extends StatelessWidget {
-  const _WireframeMetricCard({required this.title, required this.value});
-
-  final String title;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 90,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.04),
-        borderRadius: BorderRadius.circular(1),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: TextStyle(
-              color: Colors.white.withValues(alpha: 0.4),
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 1.0,
-            ),
-          ),
-          Text(
-            value,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ],
       ),
     );
   }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 import 'package:open_trail/models/ride_model.dart';
 import 'package:open_trail/models/rider_location_model.dart';
+import 'package:open_trail/services/navigation_service.dart';
 import 'package:open_trail/widgets/group_sheet/group_sheet.dart';
 
 class RideInfoCard extends StatelessWidget {
@@ -11,6 +12,9 @@ class RideInfoCard extends StatelessWidget {
     required this.ride,
     required this.distance,
     required this.duration,
+
+    required this.navigationService,
+
     required this.riders,
     required this.currentUserName,
     required this.currentUserId,
@@ -19,6 +23,7 @@ class RideInfoCard extends StatelessWidget {
   });
 
   final RideModel? ride;
+  final NavigationService navigationService;
 
   final String distance;
   final String duration;
@@ -88,6 +93,9 @@ class RideInfoCard extends StatelessWidget {
                       ride: currentRide,
                       distance: distance,
                       duration: duration,
+
+                      navigationService: navigationService,
+
                       riders: riders,
                       currentUserName: currentUserName,
                       currentUserId: currentUserId,
