@@ -9,18 +9,24 @@ import 'package:flutter_map_animations/flutter_map_animations.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
+import 'package:open_trail/features/maps/widgets/_waypoint_info_sheet.dart';
+import 'package:open_trail/features/maps/widgets/add_waypoint_sheet.dart';
 import 'package:open_trail/features/maps/widgets/floating_control_bar.dart';
 import 'package:open_trail/features/maps/widgets/map_view.dart';
 import 'package:open_trail/features/maps/widgets/navigation_banner.dart';
 import 'package:open_trail/features/maps/widgets/ride_info_card.dart';
+import 'package:open_trail/features/maps/widgets/waypoint_search_bar.dart';
+import 'package:open_trail/features/maps/widgets/waypoint_search_results.dart';
 import 'package:open_trail/models/navigation_step.dart';
 import 'package:open_trail/models/ride_model.dart';
 import 'package:open_trail/models/rider_location_model.dart';
+import 'package:open_trail/models/waypoint_model.dart';
 import 'package:open_trail/services/live_location_service.dart';
 import 'package:open_trail/services/location_search_service.dart';
 import 'package:open_trail/services/navigation_service.dart';
 import 'package:open_trail/services/ride_service.dart';
 import 'package:open_trail/services/route_service.dart';
+import 'package:open_trail/services/waypoint_service.dart';
 import 'package:open_trail/widgets/inline_search_bar.dart';
 import 'package:open_trail/widgets/inline_search_results.dart';
 
@@ -43,6 +49,8 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   late final NavigationService _navigationService;
   final Map<String, List<LatLng>> _leaderRoutes = {};
   final LiveLocationService _liveLocationService = LiveLocationService();
+  final WaypointService _waypointService = WaypointService();
+
   bool get _isLeader => _currentRide?.leaderId == _rideService.currentUserId;
   int _leaderRouteRequestId = 0;
   bool _isLoadingLeaderRoutes = false;
@@ -55,11 +63,13 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   static const _leaderRouteEndpointMinDistanceMeters = 12;
 
   StreamSubscription<RideModel?>? _rideSubscription;
+  StreamSubscription<List<WaypointModel>>? _waypointSubscription;
   RideModel? _currentRide;
   bool isSatteliteMode = false;
 
   Position? _currentPosition;
   LatLng? _searchedLocation;
+  String? _searchedLocationLabel;
   List<LatLng> _remainingRoute = [];
   List<LatLng> _completedRoute = [];
   LatLng? _restoredMapCenter;
@@ -87,9 +97,19 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   bool _isSearching = false;
   String _searchQuery = "";
 
+  bool _showWaypointSearch = false;
+  bool _isWaypointSearching = false;
+  String _waypointSearchQuery = "";
+  List<dynamic> _waypointSearchResults = [];
+  final TextEditingController _waypointSearchController =
+      TextEditingController();
+
   late final Stream<List<RiderLocationModel>> _ridersStream;
+  late final Stream<List<WaypointModel>> _waypointsStream;
+
   List<RiderLocationModel> _allRiders = [];
   List<RiderLocationModel> _otherRiders = [];
+  List<WaypointModel> _waypoints = [];
 
   Future<void> _performSearch(String query) async {
     _searchDebounce?.cancel();
@@ -124,6 +144,192 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
         _isSearching = false;
       });
     });
+  }
+
+  Future<void> _performWaypointSearch(String query) async {
+    _searchDebounce?.cancel();
+
+    if (query.trim().isEmpty) {
+      if (!mounted) return;
+
+      setState(() {
+        _waypointSearchResults = [];
+        _isWaypointSearching = false;
+      });
+
+      return;
+    }
+
+    _searchDebounce = Timer(const Duration(milliseconds: 350), () async {
+      if (!mounted) return;
+
+      setState(() {
+        _isWaypointSearching = true;
+      });
+
+      final results = await _locationSearchService.searchPlaces(
+        query,
+        latitude: _currentPosition?.latitude,
+        longitude: _currentPosition?.longitude,
+      );
+
+      if (!mounted) return;
+
+      setState(() {
+        _waypointSearchResults = results;
+        _isWaypointSearching = false;
+      });
+    });
+  }
+
+  void _closeWaypointSearch() {
+    FocusManager.instance.primaryFocus?.unfocus();
+
+    _searchDebounce?.cancel();
+    _waypointSearchController.clear();
+
+    setState(() {
+      _showWaypointSearch = false;
+      _waypointSearchQuery = "";
+      _waypointSearchResults.clear();
+      _isWaypointSearching = false;
+    });
+  }
+
+  Future<void> _onAddWaypointPressed() async {
+    await HapticFeedback.mediumImpact();
+
+    if (!_isLeader || widget.rideDocumentId == null) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Only the ride leader can add waypoints."),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _showWaypointSearch = true;
+    });
+  }
+
+  Future<void> _onWaypointPlaceSelected(
+    LatLng location,
+    String locationName,
+  ) async {
+    _closeWaypointSearch();
+
+    if (!mounted) return;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AddWaypointSheet(
+        rideId: widget.rideDocumentId!,
+        location: location,
+        locationName: locationName,
+      ),
+    );
+  }
+
+  Future<void> _showWaypointInfo(WaypointModel waypoint) async {
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => WaypointInfoSheet(
+        waypoint: waypoint,
+        isLeader: _isLeader,
+        onEdit: _isLeader ? () => _editWaypoint(waypoint) : null,
+        onDelete: _isLeader ? () => _deleteWaypoint(waypoint) : null,
+        onToggleCompleted: _isLeader
+            ? () => _setWaypointCompleted(waypoint, !waypoint.completed)
+            : null,
+      ),
+    );
+  }
+
+  Future<void> _editWaypoint(WaypointModel waypoint) async {
+    Navigator.pop(context);
+
+    if (widget.rideDocumentId == null) return;
+
+    await showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => AddWaypointSheet(
+        rideId: widget.rideDocumentId!,
+        location: waypoint.location,
+        locationName: waypoint.locationName,
+        waypoint: waypoint,
+      ),
+    );
+  }
+
+  Future<void> _deleteWaypoint(WaypointModel waypoint) async {
+    Navigator.pop(context);
+
+    final confirmed = await showCupertinoDialog<bool>(
+      context: context,
+      builder: (context) {
+        return CupertinoAlertDialog(
+          title: const Text("Delete waypoint?"),
+          content: Text(
+            "${waypoint.title} will be removed from this ride itinerary.",
+          ),
+          actions: [
+            CupertinoDialogAction(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text("Cancel"),
+            ),
+            CupertinoDialogAction(
+              isDestructiveAction: true,
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text("Delete"),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true || widget.rideDocumentId == null) return;
+
+    try {
+      await _waypointService.deleteWaypoint(
+        rideId: widget.rideDocumentId!,
+        waypointId: waypoint.id,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
+  }
+
+  Future<void> _setWaypointCompleted(
+    WaypointModel waypoint,
+    bool completed,
+  ) async {
+    Navigator.pop(context);
+
+    if (widget.rideDocumentId == null) return;
+
+    try {
+      await _waypointService.setWaypointCompleted(
+        rideId: widget.rideDocumentId!,
+        waypointId: waypoint.id,
+        completed: completed,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(e.toString())));
+    }
   }
 
   String get _stateCacheKey => widget.rideDocumentId ?? '__standalone_map__';
@@ -208,6 +414,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
       );
     _allRiders = List.of(snapshot.allRiders);
     _otherRiders = List.of(snapshot.otherRiders);
+    _searchedLocationLabel = snapshot.searchedLocationLabel;
   }
 
   void _persistState() {
@@ -246,6 +453,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
           entry.key: List<LatLng>.of(entry.value),
       },
       allRiders: List.of(_allRiders),
+      searchedLocationLabel: _searchedLocationLabel,
     );
   }
 
@@ -464,6 +672,10 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
       _ridersStream = _liveLocationService.watchLocations(
         widget.rideDocumentId!,
       );
+
+      _waypointsStream = _waypointService.watchWaypoints(
+        widget.rideDocumentId!,
+      );
     }
 
     _navigationService = NavigationService(_routeService)
@@ -481,6 +693,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     _initializeLocation();
     _listenToConvoy();
     _listenToRide();
+    _listenToWaypoints();
   }
 
   void _handleNavigationStateChanged() {
@@ -554,6 +767,31 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     if (user?.displayName?.trim().isNotEmpty == true) {
       _cachedUserName = user!.displayName!;
     }
+  }
+
+  void _updateRideWaypoints(List<WaypointModel> waypoints) {
+    if (!mounted) return;
+    setState(() {
+      _waypoints = List<WaypointModel>.unmodifiable(waypoints);
+      if (_currentRide != null) {
+        _currentRide = _currentRide!.copyWith(
+          waypoints: List<WaypointModel>.from(waypoints),
+        );
+      }
+    });
+  }
+
+void _listenToWaypoints() {
+    if (widget.rideDocumentId == null || _waypointsStream == null) return;
+
+    _waypointSubscription = _waypointsStream.listen(
+      (waypoints) {
+        _updateRideWaypoints(waypoints);
+      },
+      onError: (e) {
+        debugPrint('Waypoint stream error: $e');
+      },
+    );
   }
 
   void _listenToRide() {
@@ -832,6 +1070,8 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
       if (!mounted) return;
 
       setState(() {
+        _searchedLocation = destination;
+        _searchedLocationLabel = label;
         _searchResults = [];
       });
 
@@ -885,6 +1125,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   void dispose() {
     _persistState();
     _searchController.dispose();
+    _waypointSearchController.dispose();
     _positionSubscription?.cancel();
     _navigationService.removeListener(_handleNavigationStateChanged);
     _navigationService.dispose();
@@ -893,6 +1134,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     _turnBannerTimer?.cancel();
     _leaderRouteRefreshTimer?.cancel();
     _searchDebounce?.cancel();
+    _waypointSubscription?.cancel();
     super.dispose();
   }
 
@@ -903,11 +1145,19 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
       return const SizedBox.shrink();
     }
     return PopScope(
-      canPop: !_showSearch,
+      canPop: !_showSearch && !_showWaypointSearch,
 
       onPopInvokedWithResult: (didPop, result) {
-        if (!didPop && _showSearch) {
-          _closeSearch();
+        if (!didPop) {
+          if (_showSearch) {
+            _closeSearch();
+            return;
+          }
+
+          if (_showWaypointSearch) {
+            _closeWaypointSearch();
+            return;
+          }
         }
       },
       child: GlassScaffold(
@@ -925,6 +1175,8 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
               remainingRoute: _remainingRoute,
               otherRiders: _otherRiders,
               leaderRoutes: _leaderRoutes,
+              waypoints: _waypoints,
+              onWaypointTap: _showWaypointInfo,
               cachedUserName: _cachedUserName,
               isLeader: _isLeader,
             ),
@@ -941,15 +1193,16 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
                           alignment: Alignment.topCenter,
                           children: [
                             AnimatedOpacity(
-                              opacity: _showSearch ? 0 : 1,
+                              opacity: (!_showSearch && !_showWaypointSearch)
+                                  ? 1
+                                  : 0,
                               duration: const Duration(milliseconds: 200),
                               child: IgnorePointer(
-                                ignoring: _showSearch,
+                                ignoring: _showSearch || _showWaypointSearch,
                                 child: RideInfoCard(
                                   ride: _currentRide,
                                   distance: _routeDistanceLabel,
                                   duration: _routeDurationLabel,
-
                                   navigationService: _navigationService,
                                   riders: _allRiders,
                                   currentUserName: _cachedUserName,
@@ -972,14 +1225,51 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
                                     setState(() {
                                       _searchQuery = value;
                                     });
+
                                     _performSearch(value);
                                   },
                                   onCloseSearch: _closeSearch,
                                 ),
                               ),
                             ),
+
+                            AnimatedOpacity(
+                              opacity: _showWaypointSearch ? 1 : 0,
+                              duration: const Duration(milliseconds: 200),
+                              child: IgnorePointer(
+                                ignoring: !_showWaypointSearch,
+                                child: WaypointSearchBar(
+                                  controller: _waypointSearchController,
+                                  searchQuery: _waypointSearchQuery,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _waypointSearchQuery = value;
+                                    });
+
+                                    _performWaypointSearch(value);
+                                  },
+                                  onClose: _closeWaypointSearch,
+                                ),
+                              ),
+                            ),
                           ],
                         ),
+                      ),
+                      AnimatedSize(
+                        duration: const Duration(milliseconds: 300),
+                        curve: Curves.fastOutSlowIn,
+                        child:
+                            (_showWaypointSearch &&
+                                _waypointSearchQuery.trim().length >= 2)
+                            ? Padding(
+                                padding: const EdgeInsets.only(top: 10),
+                                child: WaypointSearchResults(
+                                  places: _waypointSearchResults,
+                                  isLoading: _isWaypointSearching,
+                                  onPlaceSelected: _onWaypointPlaceSelected,
+                                ),
+                              )
+                            : const SizedBox(width: double.infinity, height: 0),
                       ),
                       AnimatedSwitcher(
                         duration: const Duration(milliseconds: 300),
@@ -988,6 +1278,8 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
                           isVisible:
                               _isNavigating &&
                               !_isSearching &&
+                              !_showSearch &&
+                              !_showWaypointSearch &&
                               _steps.isNotEmpty &&
                               _showTurnBanner,
                           step: _steps.isEmpty ? null : _steps[_currentStep],
@@ -996,7 +1288,10 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
                       ),
                       AnimatedSwitcher(
                         duration: const Duration(milliseconds: 250),
-                        child: (_hasRouteSummary && !_showSearch)
+                        child:
+                            (_hasRouteSummary &&
+                                !_showSearch &&
+                                !_showWaypointSearch)
                             ? Padding(
                                 key: const ValueKey('route_summary_card'),
                                 padding: const EdgeInsets.only(top: 10),
@@ -1040,7 +1335,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
                             ),
                           );
                         },
-                        child: !_showSearch
+                        child: (!_showSearch && !_showWaypointSearch)
                             ? FloatingControlBar(
                                 key: const ValueKey('floating_toolbar'),
                                 isSatelliteMode: isSatteliteMode,
@@ -1091,6 +1386,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
                                     zoom: 18,
                                   );
                                 },
+                                onAddWaypoint: _onAddWaypointPressed,
                               )
                             : const SizedBox.shrink(
                                 key: ValueKey('empty_toolbar'),
@@ -1211,6 +1507,7 @@ class _MapPageSnapshot {
     required this.otherRiders,
     required this.leaderRoutes,
     required this.allRiders,
+    required this.searchedLocationLabel,
   });
 
   final RideModel? currentRide;
@@ -1235,4 +1532,5 @@ class _MapPageSnapshot {
   final List<RiderLocationModel> otherRiders;
   final Map<String, List<LatLng>> leaderRoutes;
   final List<RiderLocationModel> allRiders;
+  final String? searchedLocationLabel;
 }

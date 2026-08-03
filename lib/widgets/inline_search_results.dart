@@ -1,6 +1,6 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
-import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 class InlineSearchResults extends StatelessWidget {
   final List<dynamic> places;
@@ -16,41 +16,50 @@ class InlineSearchResults extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ConstrainedBox(
+    return Container(
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.45,
       ),
-      child: GlassCard(
-        useOwnLayer: true,
-        settings: LiquidGlassSettings(
-          thickness: 15,
-          refractiveIndex: 15.12,
-          blur: 5,
-        ),
-        quality: GlassQuality.premium,
-        shape: LiquidRoundedRectangle(borderRadius: 15),
-        padding: const EdgeInsets.symmetric(vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFF09090B),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.5),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
         child: Builder(
           builder: (context) {
             if (isLoading) {
               return const SizedBox(
-                height: 120,
+                height: 100,
                 child: Center(
-                  child: CircularProgressIndicator(
+                  child: CupertinoActivityIndicator(
+                    radius: 10,
                     color: Colors.white,
-                    strokeWidth: 2,
                   ),
                 ),
               );
             }
 
             if (places.isEmpty) {
-              return const SizedBox(
-                height: 120,
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
                 child: Center(
                   child: Text(
-                    "No locations found",
-                    style: TextStyle(color: Colors.white38),
+                    "NO LOCATIONS FOUND",
+                    style: TextStyle(
+                      color: Color(0xFF71717A),
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 1.2,
+                    ),
                   ),
                 ),
               );
@@ -59,14 +68,16 @@ class InlineSearchResults extends StatelessWidget {
             return ListView.separated(
               shrinkWrap: true,
               physics: const BouncingScrollPhysics(),
+              padding: EdgeInsets.zero,
               itemCount: places.length,
-              separatorBuilder: (_, __) =>
-                  const Divider(color: Colors.white10, height: 1),
+              separatorBuilder: (_, __) => Divider(
+                height: 1,
+                thickness: 1,
+                color: Colors.white.withOpacity(0.06),
+              ),
               itemBuilder: (context, index) {
                 final place = places[index] as Map<String, dynamic>;
-
                 final properties = place['properties'] as Map<String, dynamic>;
-
                 final coordinates =
                     properties['coordinates'] as Map<String, dynamic>;
 
@@ -83,60 +94,85 @@ class InlineSearchResults extends StatelessWidget {
                         .toString();
 
                 final lat = (coordinates['latitude'] as num).toDouble();
-
                 final lon = (coordinates['longitude'] as num).toDouble();
 
                 final featureType = (properties['feature_type'] ?? '')
                     .toString();
 
                 IconData icon;
-
                 switch (featureType) {
                   case 'poi':
-                    icon = Icons.place_outlined;
+                    icon = CupertinoIcons.placemark_fill;
                     break;
-
                   case 'address':
-                    icon = Icons.home_outlined;
+                    icon = CupertinoIcons.house_fill;
                     break;
-
                   case 'street':
-                    icon = Icons.route_outlined;
+                    icon = CupertinoIcons.waveform_path;
                     break;
-
                   case 'place':
-                    icon = Icons.location_city_outlined;
+                    icon = CupertinoIcons.building_2_fill;
                     break;
-
                   default:
-                    icon = Icons.location_on_outlined;
+                    icon = CupertinoIcons.location_fill;
                 }
 
-                return ListTile(
-                  contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 4,
-                  ),
-                  leading: Icon(icon, color: Colors.white70),
-                  title: Text(
-                    title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  subtitle: Text(
-                    subtitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white38, fontSize: 12),
-                  ),
+                return InkWell(
+                  splashColor: Colors.white.withOpacity(0.08),
+                  highlightColor: Colors.white.withOpacity(0.04),
                   onTap: () {
                     onPlaceSelected(LatLng(lat, lon), title);
                   },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(icon, color: const Color(0xFFA1A1AA), size: 14),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Color(0xFFFAFAFA),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                  letterSpacing: -0.2,
+                                ),
+                              ),
+                              if (subtitle.isNotEmpty) ...[
+                                const SizedBox(height: 2),
+                                Text(
+                                  subtitle,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Color(0xFF71717A),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Icon(
+                          CupertinoIcons.arrow_up_left,
+                          color: Color(0xFF52525B),
+                          size: 12,
+                        ),
+                      ],
+                    ),
+                  ),
                 );
               },
             );

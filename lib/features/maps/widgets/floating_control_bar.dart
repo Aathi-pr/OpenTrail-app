@@ -10,6 +10,7 @@ class FloatingControlBar extends StatefulWidget {
     required this.onToggleSatellite,
     required this.onNavigation,
     required this.onCenterLocation,
+    required this.onAddWaypoint,
   });
 
   final bool isSatelliteMode;
@@ -19,6 +20,7 @@ class FloatingControlBar extends StatefulWidget {
   final VoidCallback onToggleSatellite;
   final VoidCallback onNavigation;
   final VoidCallback onCenterLocation;
+  final VoidCallback onAddWaypoint;
 
   @override
   State<FloatingControlBar> createState() => _FloatingControlBarState();
@@ -59,8 +61,13 @@ class _FloatingControlBarState extends State<FloatingControlBar> {
         selectedIndex: _selectedIndex,
         onTabSelected: _handleTab,
         barBorderRadius: 50,
-        extraButton: GlassTabBarExtraButton(icon: Icon(CupertinoIcons.map_pin_ellipse), onTap: (){}, label: 'Add points'),
-        quality: GlassQuality.premium,
+        extraButton: GlassTabBarExtraButton(
+          icon: const Icon(CupertinoIcons.map_pin_ellipse),
+
+          label: 'Add Waypoint',
+
+          onTap: widget.onAddWaypoint,
+        ),
         maskingQuality: MaskingQuality.high,
         settings: const LiquidGlassSettings(
           thickness: 20,

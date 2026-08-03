@@ -45,10 +45,10 @@ class AnimatedUserMarker extends StatelessWidget {
         Transform.rotate(
           angle: heading * math.pi / 180,
           child: FaIcon(
-            FontAwesomeIcons.locationArrow,
-            size: 30,
+            FontAwesomeIcons.solidCircle,
+            size: 20,
             color: isLeader ? Colors.orangeAccent : const Color(0xFF4DA3FF),
-          ),
+          )
         ),
       ],
     );

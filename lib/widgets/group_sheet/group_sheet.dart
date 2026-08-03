@@ -6,6 +6,7 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:open_trail/auth/auth_service.dart';
 import 'package:open_trail/models/ride_model.dart';
 import 'package:open_trail/models/rider_location_model.dart';
+import 'package:open_trail/models/waypoint_model.dart';
 import 'package:open_trail/services/navigation_service.dart';
 import 'package:open_trail/widgets/group_sheet/ride_progress_card.dart';
 import 'package:open_trail/widgets/group_sheet/ride_summary_grid.dart';
@@ -16,13 +17,13 @@ class GroupSheet extends StatefulWidget {
     required this.ride,
     required this.distance,
     required this.duration,
-
     required this.navigationService,
     required this.riders,
     required this.currentUserName,
     required this.currentUserId,
     required this.isLeader,
     required this.isNavigating,
+    this.onWaypointToggle,
   });
 
   final RideModel ride;
@@ -35,6 +36,9 @@ class GroupSheet extends StatefulWidget {
   final String currentUserId;
   final bool isNavigating;
   final bool isLeader;
+
+  /// Optional callback to mark waypoints completed/uncompleted directly from sheet
+  final Function(WaypointModel waypoint)? onWaypointToggle;
 
   @override
   State<GroupSheet> createState() => _GroupSheetState();
@@ -75,6 +79,8 @@ class _GroupSheetState extends State<GroupSheet> {
     final joinLink =
         "opentrail://join-ride?rideId=${Uri.encodeComponent(widget.ride.rideId)}";
 
+    final waypoints = widget.ride.waypoints ?? [];
+
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.60,
@@ -82,7 +88,7 @@ class _GroupSheetState extends State<GroupSheet> {
       maxChildSize: 0.92,
       builder: (context, controller) {
         return Container(
-          decoration: BoxDecoration(color: Colors.black),
+          decoration: const BoxDecoration(color: Colors.black),
           child: Builder(
             builder: (context) {
               final effectiveRiders = _getNormalizedRidersList(widget.riders);
@@ -288,6 +294,64 @@ class _GroupSheetState extends State<GroupSheet> {
 
                   const SizedBox(height: 12),
 
+                  // ================= WAYPOINTS SECTION =================
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        "WAYPOINTS",
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.5,
+                        ),
+                      ),
+                      Text(
+                        "${waypoints.length} Stops",
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.4),
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 12),
+
+                  if (waypoints.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Center(
+                        child: Text(
+                          "No waypoints added yet",
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.4),
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    )
+                  else
+                    ...waypoints.map((waypoint) {
+                      return _WireframeWaypointTile(
+                        waypoint: waypoint,
+                        onTap: widget.onWaypointToggle != null
+                            ? () => widget.onWaypointToggle!(waypoint)
+                            : null,
+                      );
+                    }),
+
+                  const SizedBox(height: 24),
+
+                  Divider(
+                    color: Colors.white.withValues(alpha: 0.1),
+                    height: 1,
+                  ),
+
+                  const SizedBox(height: 12),
+
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -370,6 +434,124 @@ class _GroupSheetState extends State<GroupSheet> {
           ),
         );
       },
+    );
+  }
+}
+
+class _WireframeWaypointTile extends StatelessWidget {
+  const _WireframeWaypointTile({required this.waypoint, this.onTap});
+
+  final WaypointModel waypoint;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final titleText = waypoint.title.isNotEmpty
+        ? waypoint.title
+        : (waypoint.locationName.isNotEmpty
+              ? waypoint.locationName
+              : waypoint.categoryLabel);
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(1),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.04),
+          borderRadius: BorderRadius.circular(1),
+          border: Border.all(
+            color: waypoint.completed
+                ? Colors.greenAccent.withValues(alpha: 0.3)
+                : Colors.white.withValues(alpha: 0.08),
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: waypoint.categoryColor.withValues(alpha: 0.15),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: waypoint.categoryColor.withValues(alpha: 0.4),
+                  width: 1,
+                ),
+              ),
+              child: Icon(
+                waypoint.categoryIcon,
+                size: 18,
+                color: waypoint.categoryColor,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    titleText,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: waypoint.completed
+                          ? Colors.white.withValues(alpha: 0.5)
+                          : Colors.white,
+                      fontWeight: FontWeight.w600,
+                      fontSize: 14,
+                      decoration: waypoint.completed
+                          ? TextDecoration.lineThrough
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Row(
+                    children: [
+                      Text(
+                        waypoint.categoryLabel.toUpperCase(),
+                        style: TextStyle(
+                          color: waypoint.categoryColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                      if (waypoint.stopMinutes > 0) ...[
+                        Text(
+                          " • ",
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.3),
+                            fontSize: 10,
+                          ),
+                        ),
+                        Text(
+                          "${waypoint.stopMinutes} MIN STOP",
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.4),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Icon(
+              waypoint.completed
+                  ? CupertinoIcons.checkmark_alt_circle_fill
+                  : CupertinoIcons.circle,
+              color: waypoint.completed
+                  ? Colors.greenAccent
+                  : Colors.white.withValues(alpha: 0.2),
+              size: 20,
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

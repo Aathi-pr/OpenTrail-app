@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:open_trail/models/waypoint_model.dart';
 
 class RideStatus {
   static const active = 'active';
@@ -18,6 +19,7 @@ class RideModel {
     this.destinationLatitude,
     this.destinationLongitude,
     this.createdAt,
+    this.waypoints,
   });
 
   final String documentId;
@@ -36,6 +38,9 @@ class RideModel {
   /// True when the leader has started navigation.
   final bool isNavigating;
 
+  /// Intermediate stops along the ride route.
+  final List<WaypointModel>? waypoints;
+
   bool get isActive => status == RideStatus.active;
 
   factory RideModel.fromFirestore(
@@ -43,6 +48,8 @@ class RideModel {
   ) {
     final data = document.data() ?? <String, dynamic>{};
     final createdAt = data['createdAt'];
+
+    final rawWaypoints = data['waypoints'] as List<dynamic>?;
 
     return RideModel(
       documentId: document.id,
@@ -56,6 +63,26 @@ class RideModel {
       status: data['status'] as String? ?? RideStatus.active,
       memberCount: data['memberCount'] as int? ?? 0,
       isNavigating: data['isNavigating'] as bool? ?? false,
+      waypoints: rawWaypoints?.map<WaypointModel>((w) {
+        if (w is Map<String, dynamic>) {
+          return WaypointModel.fromMap(w);
+        }
+        return WaypointModel(
+          id: '',
+          title: w.toString(),
+          description: '',
+          latitude: 0.0,
+          longitude: 0.0,
+          locationName: w.toString(),
+          stopMinutes: 0,
+          order: 0,
+          category: WaypointCategory.custom,
+          completed: false,
+          creatorId: '',
+          creatorName: '',
+          createdAt: DateTime.now(),
+        );
+      }).toList(),
     );
   }
 
@@ -71,6 +98,7 @@ class RideModel {
       'status': status,
       'memberCount': memberCount,
       'isNavigating': isNavigating,
+      'waypoints': waypoints?.map((w) => w.toMap()).toList(),
     };
   }
 
@@ -86,6 +114,7 @@ class RideModel {
     String? status,
     int? memberCount,
     bool? isNavigating,
+    List<WaypointModel>? waypoints,
   }) {
     return RideModel(
       documentId: documentId ?? this.documentId,
@@ -99,6 +128,7 @@ class RideModel {
       status: status ?? this.status,
       memberCount: memberCount ?? this.memberCount,
       isNavigating: isNavigating ?? this.isNavigating,
+      waypoints: waypoints ?? this.waypoints,
     );
   }
 }

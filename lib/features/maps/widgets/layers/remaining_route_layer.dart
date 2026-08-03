@@ -9,7 +9,7 @@ class RemainingRouteLayer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return PolylineLayer(
-      polylines: [Polyline(points: route, color: Colors.white, strokeWidth: 3)],
+      polylines: [Polyline(points: route, color: Colors.lightGreenAccent, strokeWidth: 3)],
     );
   }
 }

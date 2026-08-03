@@ -10,7 +10,9 @@ import 'package:open_trail/features/maps/widgets/layers/destination_marker_layer
 import 'package:open_trail/features/maps/widgets/layers/leader_route_layer.dart';
 import 'package:open_trail/features/maps/widgets/layers/remaining_route_layer.dart';
 import 'package:open_trail/features/maps/widgets/layers/user_marker_layer.dart';
+import 'package:open_trail/features/maps/widgets/layers/waypoint_layer.dart';
 import 'package:open_trail/models/rider_location_model.dart';
+import 'package:open_trail/models/waypoint_model.dart';
 
 class MapView extends StatelessWidget {
   const MapView({
@@ -25,6 +27,8 @@ class MapView extends StatelessWidget {
     required this.completedRoute,
     required this.remainingRoute,
     required this.otherRiders,
+    required this.waypoints,
+    required this.onWaypointTap,
     required this.leaderRoutes,
     required this.cachedUserName,
     required this.isLeader,
@@ -45,6 +49,8 @@ class MapView extends StatelessWidget {
 
   final List<RiderLocationModel> otherRiders;
   final Map<String, List<LatLng>> leaderRoutes;
+  final List<WaypointModel> waypoints;
+  final ValueChanged<WaypointModel> onWaypointTap;
 
   final String cachedUserName;
   final bool isLeader;
@@ -90,8 +96,10 @@ class MapView extends StatelessWidget {
         if (remainingRoute.isNotEmpty)
           RemainingRouteLayer(route: remainingRoute),
 
-        if (leaderRoutes.isNotEmpty)
-         LeaderRouteLayer(routes: leaderRoutes),
+        if (leaderRoutes.isNotEmpty) LeaderRouteLayer(routes: leaderRoutes),
+
+        if (waypoints.isNotEmpty)
+          WaypointLayer(waypoints: waypoints, onWaypointTap: onWaypointTap),
       ],
     );
   }

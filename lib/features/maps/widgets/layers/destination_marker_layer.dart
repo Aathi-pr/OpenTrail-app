@@ -16,9 +16,9 @@ class DestinationMarkerLayer extends StatelessWidget {
           width: 45,
           height: 45,
           child: const Icon(
-            Icons.location_on_outlined,
+            Icons.square,
             color: Colors.red,
-            size: 40,
+            size: 20,
           ),
         ),
       ],
