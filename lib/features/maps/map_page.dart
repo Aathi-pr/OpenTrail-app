@@ -799,6 +799,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     return _allRiders.where((rider) => rider.isSOS).toList();
   }
 
+  // ignore: unused_field
   Key _sosOverlayKey = UniqueKey();
 
   Future<void> _toggleSOS() async {
@@ -823,11 +824,6 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(newState ? "SOS activated." : "SOS deactivated."),
-        ),
-      );
     } catch (e) {
       debugPrint("SOS Error: $e");
 

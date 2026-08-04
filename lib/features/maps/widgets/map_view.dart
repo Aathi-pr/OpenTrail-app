@@ -12,7 +12,6 @@ import 'package:open_trail/features/maps/widgets/layers/remaining_route_layer.da
 import 'package:open_trail/features/maps/widgets/layers/user_marker_layer.dart';
 import 'package:open_trail/features/maps/widgets/layers/waypoint_layer.dart';
 import 'package:open_trail/models/rider_location_model.dart';
-import 'package:open_trail/models/sos_model.dart';
 import 'package:open_trail/models/waypoint_model.dart';
 
 class MapView extends StatelessWidget {
