@@ -11,6 +11,7 @@ class FloatingControlBar extends StatefulWidget {
     required this.onNavigation,
     required this.onCenterLocation,
     required this.onAddWaypoint,
+    required this.onSos,
   });
 
   final bool isSatelliteMode;
@@ -21,6 +22,7 @@ class FloatingControlBar extends StatefulWidget {
   final VoidCallback onNavigation;
   final VoidCallback onCenterLocation;
   final VoidCallback onAddWaypoint;
+  final VoidCallback onSos;
 
   @override
   State<FloatingControlBar> createState() => _FloatingControlBarState();
@@ -40,10 +42,14 @@ class _FloatingControlBarState extends State<FloatingControlBar> {
         break;
 
       case 2:
-        widget.onNavigation();
+        widget.onAddWaypoint();
         break;
 
       case 3:
+        widget.onNavigation();
+        break;
+
+      case 4:
         widget.onCenterLocation();
         break;
     }
@@ -62,11 +68,12 @@ class _FloatingControlBarState extends State<FloatingControlBar> {
         onTabSelected: _handleTab,
         barBorderRadius: 50,
         extraButton: GlassTabBarExtraButton(
-          icon: const Icon(CupertinoIcons.map_pin_ellipse),
-
-          label: 'Add Waypoint',
-
-          onTap: widget.onAddWaypoint,
+          icon: const Icon(
+            CupertinoIcons.exclamationmark_triangle_fill,
+            color: CupertinoColors.systemRed,
+          ),
+          label: 'SOS',
+          onTap: widget.onSos,
         ),
         maskingQuality: MaskingQuality.high,
         settings: const LiquidGlassSettings(
@@ -102,6 +109,11 @@ class _FloatingControlBarState extends State<FloatingControlBar> {
                   ? CupertinoIcons.map_fill
                   : CupertinoIcons.map,
             ),
+          ),
+
+          const GlassTab(
+            icon: Icon(CupertinoIcons.map_pin_ellipse),
+            activeIcon: Icon(CupertinoIcons.map_pin_ellipse),
           ),
 
           GlassTab(

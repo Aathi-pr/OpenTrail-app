@@ -12,7 +12,7 @@ class LiveLocationService {
     required String role,
     required Position position,
   }) async {
-await _db.child("live_locations").child(rideId).child(uid).set({
+    await _db.child("live_locations").child(rideId).child(uid).update({
       "userId": uid,
       "displayName": displayName,
       "role": role,
@@ -51,7 +51,7 @@ await _db.child("live_locations").child(rideId).child(uid).set({
     await _db.child("live_locations").child(rideId).child(uid).remove();
   }
 
-Future<void> enableDisconnectRemoval({
+  Future<void> enableDisconnectRemoval({
     required String rideId,
     required String uid,
   }) async {
@@ -61,5 +61,24 @@ Future<void> enableDisconnectRemoval({
         .child(uid)
         .onDisconnect()
         .update({"isOnline": false, "updatedAt": ServerValue.timestamp});
+  }
+
+  // ===========================
+  // SOS
+  // ===========================
+
+  Future<void> setSOS({
+    required String rideId,
+    required String uid,
+    required bool active,
+  }) async {
+    await _db.child("live_locations").child(rideId).child(uid).update({
+      "isSOS": active,
+      "updatedAt": ServerValue.timestamp,
+    });
+  }
+
+  Future<void> clearSOS({required String rideId, required String uid}) async {
+    await setSOS(rideId: rideId, uid: uid, active: false);
   }
 }

@@ -15,6 +15,7 @@ import 'package:open_trail/features/maps/widgets/floating_control_bar.dart';
 import 'package:open_trail/features/maps/widgets/map_view.dart';
 import 'package:open_trail/features/maps/widgets/navigation_banner.dart';
 import 'package:open_trail/features/maps/widgets/ride_info_card.dart';
+import 'package:open_trail/features/maps/widgets/sos_overlay.dart';
 import 'package:open_trail/features/maps/widgets/waypoint_search_bar.dart';
 import 'package:open_trail/features/maps/widgets/waypoint_search_results.dart';
 import 'package:open_trail/models/navigation_step.dart';
@@ -110,6 +111,8 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   List<RiderLocationModel> _allRiders = [];
   List<RiderLocationModel> _otherRiders = [];
   List<WaypointModel> _waypoints = [];
+
+  bool isSOSActive = false;
 
   Future<void> _performSearch(String query) async {
     _searchDebounce?.cancel();
@@ -781,8 +784,63 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
     });
   }
 
-void _listenToWaypoints() {
-    if (widget.rideDocumentId == null || _waypointsStream == null) return;
+  bool get _isSOSActive {
+    return _allRiders.any((rider) => rider.isSOS);
+  }
+
+  bool get _mySOSActive {
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return false;
+
+    return _allRiders.any((r) => r.userId == uid && r.isSOS);
+  }
+
+  List<RiderLocationModel> get _activeSOSRiders {
+    return _allRiders.where((rider) => rider.isSOS).toList();
+  }
+
+  Key _sosOverlayKey = UniqueKey();
+
+  Future<void> _toggleSOS() async {
+    if (widget.rideDocumentId == null) return;
+
+    final uid = FirebaseAuth.instance.currentUser?.uid;
+    if (uid == null) return;
+
+    final newState = !_mySOSActive;
+
+    try {
+      await HapticFeedback.heavyImpact();
+
+      setState(() {
+        _sosOverlayKey = UniqueKey();
+      });
+      await _liveLocationService.setSOS(
+        rideId: widget.rideDocumentId!,
+        uid: uid,
+        active: newState,
+      );
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(newState ? "SOS activated." : "SOS deactivated."),
+        ),
+      );
+    } catch (e) {
+      debugPrint("SOS Error: $e");
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Failed to update SOS.")));
+    }
+  }
+
+  void _listenToWaypoints() {
+    if (widget.rideDocumentId == null) return;
 
     _waypointSubscription = _waypointsStream.listen(
       (waypoints) {
@@ -855,6 +913,10 @@ void _listenToWaypoints() {
     _memberLocationsSubscription = _ridersStream.listen(
       (riders) {
         if (!mounted) return;
+
+debugPrint(
+          riders.map((r) => "${r.displayName} -> ${r.isSOS}").join("\n"),
+        );
 
         final selfId = _rideService.currentUserId;
 
@@ -1180,7 +1242,9 @@ void _listenToWaypoints() {
               cachedUserName: _cachedUserName,
               isLeader: _isLeader,
             ),
-
+            Positioned.fill(
+              child: SOSOverlay(active: _isSOSActive, riders: _activeSOSRiders),
+            ),
             if (!_isLoadingLocation && !_isLocationServiceDisabled)
               SafeArea(
                 child: Padding(
@@ -1387,6 +1451,7 @@ void _listenToWaypoints() {
                                   );
                                 },
                                 onAddWaypoint: _onAddWaypointPressed,
+                                onSos: _toggleSOS,
                               )
                             : const SizedBox.shrink(
                                 key: ValueKey('empty_toolbar'),

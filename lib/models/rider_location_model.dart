@@ -6,6 +6,7 @@ class RiderLocationModel {
     required this.displayName,
     required this.role,
     required this.isOnline,
+    this.isSOS = false,
     this.photoUrl, // Added photoUrl
     this.latitude,
     this.longitude,
@@ -24,6 +25,7 @@ class RiderLocationModel {
   final double? speed;
   final DateTime? locationUpdatedAt;
   final bool isOnline;
+  final bool isSOS;
 
   bool get hasLocation => latitude != null && longitude != null;
 
@@ -44,6 +46,7 @@ class RiderLocationModel {
       speed: (data['speed'] as num?)?.toDouble(),
       locationUpdatedAt: updatedAt is Timestamp ? updatedAt.toDate() : null,
       isOnline: data['isOnline'] as bool? ?? true,
+      isSOS: data['isSOS'] as bool? ?? false,
     );
   }
 
@@ -65,7 +68,8 @@ class RiderLocationModel {
       locationUpdatedAt: timestamp is int
           ? DateTime.fromMillisecondsSinceEpoch(timestamp)
           : null,
-      isOnline: data["isOnline"] ?? true,
+      isOnline: data["isOnline"] as bool? ?? true,
+      isSOS: data["isSOS"] as bool? ?? false,
     );
   }
 
@@ -84,6 +88,23 @@ class RiderLocationModel {
           ? Timestamp.fromDate(locationUpdatedAt!)
           : null,
       'isOnline': isOnline,
+      'isSOS': isSOS,
     };
+  }
+
+  RiderLocationModel copyWith({bool? isSOS}) {
+    return RiderLocationModel(
+      userId: userId,
+      displayName: displayName,
+      role: role,
+      photoUrl: photoUrl,
+      latitude: latitude,
+      longitude: longitude,
+      heading: heading,
+      speed: speed,
+      locationUpdatedAt: locationUpdatedAt,
+      isOnline: isOnline,
+      isSOS: isSOS ?? this.isSOS,
+    );
   }
 }
