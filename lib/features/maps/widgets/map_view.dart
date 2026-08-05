@@ -55,7 +55,6 @@ class MapView extends StatelessWidget {
   final String cachedUserName;
   final bool isLeader;
 
-
   @override
   Widget build(BuildContext context) {
     return FlutterMap(
@@ -86,7 +85,7 @@ class MapView extends StatelessWidget {
             isLeader: isLeader,
           ),
 
-        if (otherRiders.isNotEmpty) ConvoyMarkerLayer(riders: otherRiders,),
+        if (otherRiders.isNotEmpty) ConvoyMarkerLayer(riders: otherRiders),
 
         if (searchedLocation != null)
           DestinationMarkerLayer(destination: searchedLocation!),

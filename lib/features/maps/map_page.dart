@@ -629,7 +629,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
           );
           routes[target.key] = route.geometry;
         } catch (e) {
-          debugPrint("Failed to build leader route for ${target.key}: $e");
+          e.toString();
         }
       }
 
@@ -823,10 +823,7 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
       );
 
       if (!mounted) return;
-
     } catch (e) {
-      debugPrint("SOS Error: $e");
-
       if (!mounted) return;
 
       ScaffoldMessenger.of(
@@ -838,14 +835,9 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   void _listenToWaypoints() {
     if (widget.rideDocumentId == null) return;
 
-    _waypointSubscription = _waypointsStream.listen(
-      (waypoints) {
-        _updateRideWaypoints(waypoints);
-      },
-      onError: (e) {
-        debugPrint('Waypoint stream error: $e');
-      },
-    );
+    _waypointSubscription = _waypointsStream.listen((waypoints) {
+      _updateRideWaypoints(waypoints);
+    }, onError: (e) {});
   }
 
   void _listenToRide() {
@@ -906,30 +898,21 @@ class _MapPageState extends State<MapPage> with TickerProviderStateMixin {
   void _listenToConvoy() {
     if (widget.rideDocumentId == null) return;
 
-    _memberLocationsSubscription = _ridersStream.listen(
-      (riders) {
-        if (!mounted) return;
+    _memberLocationsSubscription = _ridersStream.listen((riders) {
+      if (!mounted) return;
 
-debugPrint(
-          riders.map((r) => "${r.displayName} -> ${r.isSOS}").join("\n"),
-        );
+      final selfId = _rideService.currentUserId;
 
-        final selfId = _rideService.currentUserId;
+      setState(() {
+        _allRiders = riders;
 
-        setState(() {
-          _allRiders = riders;
+        _otherRiders = riders
+            .where((r) => r.userId != selfId && r.hasLocation)
+            .toList();
+      });
 
-          _otherRiders = riders
-              .where((r) => r.userId != selfId && r.hasLocation)
-              .toList();
-        });
-
-        _scheduleLeaderRouteRefresh();
-      },
-      onError: (e) {
-        debugPrint("Convoy stream error: $e");
-      },
-    );
+      _scheduleLeaderRouteRefresh();
+    }, onError: (e) {});
   }
 
   Future<void> _maybePushLocation(Position position) async {
@@ -961,7 +944,7 @@ debugPrint(
         position: position,
       );
     } catch (e) {
-      debugPrint("Failed to push live location: $e");
+      e.toString();
     }
   }
 
@@ -988,7 +971,6 @@ debugPrint(
         destination: _searchedLocation!,
       );
     } catch (e) {
-      debugPrint("Failed to start navigation: $e");
       if (!mounted) return;
       setState(() {
         _isNavigating = false;
@@ -1096,10 +1078,6 @@ debugPrint(
             distanceFilter: 3,
           ),
         ).listen((position) {
-          debugPrint(
-            "GPS: ${position.latitude}, ${position.longitude} "
-            "accuracy=${position.accuracy}m",
-          );
 
           if (!mounted) return;
 
@@ -1167,9 +1145,7 @@ debugPrint(
           ),
         );
       }
-    } catch (e, stackTrace) {
-      debugPrint("Route building error: $e");
-      debugPrintStack(stackTrace: stackTrace);
+    } catch (e) {
 
       if (!mounted) return;
 

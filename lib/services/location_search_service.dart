@@ -1,6 +1,5 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:http/http.dart' as http;
 
@@ -15,7 +14,6 @@ class LocationSearchService {
     final token = dotenv.env['MAPBOX_ACCESS_TOKEN'];
 
     if (token == null || token.isEmpty) {
-      debugPrint("MAPBOX_ACCESS_TOKEN not found.");
       return [];
     }
 
@@ -39,13 +37,9 @@ class LocationSearchService {
       params,
     );
 
-    debugPrint(uri.toString());
-
     try {
       final response = await http.get(uri);
 
-      debugPrint("Status: ${response.statusCode}");
-      debugPrint(response.body);
 
       if (response.statusCode != 200) {
         return [];
@@ -55,7 +49,6 @@ class LocationSearchService {
 
       return List<dynamic>.from(json['features'] ?? []);
     } catch (e) {
-      debugPrint("Search Error: $e");
       return [];
     }
   }

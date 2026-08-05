@@ -13,8 +13,6 @@ void main() async {
 
   FlutterError.onError = (FlutterErrorDetails details) {
     FlutterError.presentError(details);
-
-    debugPrint(details.exceptionAsString());
   };
   runApp(LiquidGlassWidgets.wrap(child: const OpenTrail()));
 }

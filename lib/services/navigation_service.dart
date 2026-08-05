@@ -85,7 +85,7 @@ class NavigationService extends ChangeNotifier {
         accuracy: LocationAccuracy.bestForNavigation,
         distanceFilter: 3,
       ),
-    ).listen(_handleGpsUpdate, onError: (e) => debugPrint('$e'));
+    ).listen(_handleGpsUpdate);
   }
 
   Future<void> stopNavigation() async {
@@ -116,13 +116,7 @@ class NavigationService extends ChangeNotifier {
     }
 
     final projection = _snapToRoute(rawLocation, _fullRoute);
-    debugPrint('RAW    : ${rawLocation.latitude}, ${rawLocation.longitude}');
 
-    debugPrint(
-      'SNAPPED: ${projection.point.latitude}, ${projection.point.longitude}',
-    );
-
-    debugPrint('Offset : ${projection.distanceMeters.toStringAsFixed(1)} m');
     final offRoute =
         _distanceFromRoute(rawLocation, _fullRoute) > _offRouteDistanceMeters;
 
@@ -286,7 +280,6 @@ class NavigationService extends ChangeNotifier {
         navigating: true,
       );
     } catch (e) {
-      debugPrint('Navigation reroute failed: $e');
       final latest = _state;
       if (latest != null) {
         _setState(latest.copyWith(rerouting: false));

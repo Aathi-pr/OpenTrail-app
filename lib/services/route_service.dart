@@ -18,10 +18,6 @@ class RouteService {
       throw Exception("ORS_API_KEY not found in .env");
     }
 
-    debugPrint("========== ROUTE REQUEST ==========");
-    debugPrint("Start : ${start.latitude}, ${start.longitude}");
-    debugPrint("End   : ${end.latitude}, ${end.longitude}");
-
     // Basic validation
     if (start.latitude.abs() > 90 ||
         end.latitude.abs() > 90 ||
@@ -43,16 +39,11 @@ class RouteService {
       "instructions_format": "text",
     };
 
-    debugPrint(jsonEncode(body));
-
     final response = await http.post(
       uri,
       headers: {"Authorization": apiKey, "Content-Type": "application/json"},
       body: jsonEncode(body),
     );
-
-    debugPrint("Status: ${response.statusCode}");
-    debugPrint(response.body);
 
     if (response.statusCode != 200) {
       throw Exception(

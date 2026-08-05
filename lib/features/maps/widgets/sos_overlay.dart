@@ -112,9 +112,6 @@ class _SOSOverlayState extends State<SOSOverlay> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    debugPrint(
-      "Overlay riders: ${widget.riders.map((e) => e.displayName).toList()}",
-    );
     if (!_isVisible || _shader == null) {
       return const SizedBox.shrink();
     }
@@ -157,8 +154,7 @@ class _SOSOverlayState extends State<SOSOverlay> with TickerProviderStateMixin {
             child: AnimatedAlign(
               duration: const Duration(milliseconds: 400),
               curve: Curves.easeOutCubic,
-              alignment:
-                  _isHidden ? Alignment.bottomCenter : Alignment.center,
+              alignment: _isHidden ? Alignment.bottomCenter : Alignment.center,
               child: AnimatedSlide(
                 duration: const Duration(milliseconds: 400),
                 curve: Curves.easeOutCubic,
@@ -205,16 +201,13 @@ class _SOSOverlayState extends State<SOSOverlay> with TickerProviderStateMixin {
                               },
                             )
                           : _ExpandedSOSPanel(
-
                               key: const ValueKey("expanded_panel"),
                               riders: widget.riders,
                               onHide: () {
                                 setState(() {
                                   _isHidden = true;
-
                                 });
                               },
-
                             ),
                     ),
                   ),
@@ -343,8 +336,9 @@ class _SOSStatusCard extends StatelessWidget {
         ? rider!.displayName
         : "A Rider";
 
-    final String initial =
-        displayName.isNotEmpty ? displayName[0].toUpperCase() : "R";
+    final String initial = displayName.isNotEmpty
+        ? displayName[0].toUpperCase()
+        : "R";
 
     final statusText = isCurrentUser ? "SIGNAL ACTIVE" : "NEEDS ASSISTANCE";
 
@@ -429,10 +423,7 @@ class _SOSStatusCard extends StatelessWidget {
 }
 
 class _MinimalSOSBottomBar extends StatelessWidget {
-  const _MinimalSOSBottomBar({
-    super.key,
-    required this.onExpand,
-  });
+  const _MinimalSOSBottomBar({super.key, required this.onExpand});
 
   final VoidCallback onExpand;
 

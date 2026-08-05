@@ -69,7 +69,7 @@ class _FloatingControlBarState extends State<FloatingControlBar> {
       child: GlassTabBar.bottom(
         selectedIndex: _selectedIndex,
         onTabSelected: _handleTab,
-        barBorderRadius: 50,
+        barBorderRadius: 40,
         extraButton: GlassTabBarExtraButton(
           icon: _SosHoldButton(
             onConfirmed: widget.onSos,
@@ -80,12 +80,12 @@ class _FloatingControlBarState extends State<FloatingControlBar> {
         ),
         maskingQuality: MaskingQuality.high,
         settings: const LiquidGlassSettings(
-          thickness: 20,
-          blur: 3,
-          refractiveIndex: 1.2,
-          lightIntensity: .5,
-          chromaticAberration: .01,
-          saturation: 1.2,
+          thickness: 32,
+          blur: 8,
+          refractiveIndex: 1.35,
+          lightIntensity: 1.0,
+          chromaticAberration: 0.03,
+          saturation: 1.35,
         ),
         horizontalPadding: 0,
         verticalPadding: 8,
