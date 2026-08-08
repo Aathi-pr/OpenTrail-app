@@ -1,17 +1,26 @@
-import 'dart:ui' as ui;
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:liquid_glass_widgets/liquid_glass_widgets.dart';
 
 import 'package:open_trail/auth/auth_service.dart';
+import 'package:open_trail/features/community/community_page.dart';
+import 'package:open_trail/features/home/dialogs/join_ride_dialog.dart';
+import 'package:open_trail/features/home/widgets/empty_rides_state.dart';
+import 'package:open_trail/services/ride_service.dart';
+import 'package:open_trail/features/home/widgets/floating_glass_bottom_bar.dart';
+import 'package:open_trail/features/home/widgets/greeting_section.dart';
+import 'package:open_trail/features/home/widgets/hero_section.dart';
+import 'package:open_trail/features/home/widgets/home_header.dart';
+import 'package:open_trail/features/home/widgets/quick_actions.dart';
+import 'package:open_trail/features/home/widgets/ride_card.dart';
+import 'package:open_trail/features/home/widgets/ride_segment_selector.dart';
+import 'package:open_trail/features/home/widgets/weather_summary.dart';
 import 'package:open_trail/features/maps/map_page.dart';
-import 'package:open_trail/features/settings/settings_page.dart';
 import 'package:open_trail/features/weather/dynamic_weather_background.dart';
 import 'package:open_trail/features/weather/weather_condition.dart';
+import 'package:open_trail/features/weather/weather_data.dart';
 import 'package:open_trail/features/weather/weather_service.dart';
-import 'package:open_trail/services/ride_service.dart';
-import 'package:open_trail/widgets/opentrail_button.dart';
 
 class MainNavigationPage extends StatefulWidget {
   const MainNavigationPage({super.key});
@@ -23,6 +32,12 @@ class MainNavigationPage extends StatefulWidget {
 class _MainNavigationPageState extends State<MainNavigationPage> {
   int _currentIndex = 0;
 
+  final List<Widget> _pages = const [
+    HomePage(),
+    MyRidesPage(),
+    CommunityPage(),
+  ];
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -30,11 +45,22 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // Preserve screen state across tab switching
-          IndexedStack(
-            index: _currentIndex,
-            children: const [HomePage(), MyRidesPage()],
-          ),
+          // Persistent Stack with Butter-Smooth Depth Fade Transition
+          for (int i = 0; i < _pages.length; i++)
+            IgnorePointer(
+              ignoring: i != _currentIndex,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 240),
+                curve: Curves.easeInOutCubic,
+                opacity: i == _currentIndex ? 1.0 : 0.0,
+                child: AnimatedScale(
+                  duration: const Duration(milliseconds: 240),
+                  curve: Curves.easeOutCubic,
+                  scale: i == _currentIndex ? 1.0 : 0.98,
+                  child: _pages[i],
+                ),
+              ),
+            ),
 
           // Floating Glass Bottom Navigation Bar
           Positioned(
@@ -43,13 +69,16 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
             bottom: 24,
             child: Center(
               child: SizedBox(
-                width: 290, // adjust to taste
+                width: 360,
                 child: Material(
                   color: Colors.transparent,
                   child: FloatingGlassBottomBar(
                     currentIndex: _currentIndex,
                     onTabSelected: (index) {
-                      setState(() => _currentIndex = index);
+                      HapticFeedback.mediumImpact();
+                      if (_currentIndex != index) {
+                        setState(() => _currentIndex = index);
+                      }
                     },
                   ),
                 ),
@@ -58,106 +87,6 @@ class _MainNavigationPageState extends State<MainNavigationPage> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class FloatingGlassBottomBar extends StatelessWidget {
-  final int currentIndex;
-  final ValueChanged<int> onTabSelected;
-
-  const FloatingGlassBottomBar({
-    super.key,
-    required this.currentIndex,
-    required this.onTabSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassTabBar.bottom(
-      selectedIndex: currentIndex,
-      onTabSelected: onTabSelected,
-      barBorderRadius: 40,
-      maskingQuality: MaskingQuality.high,
-      settings: const LiquidGlassSettings(
-        thickness: 20,
-        blur: 4,
-        refractiveIndex: 1.25,
-        lightIntensity: 0.6,
-        chromaticAberration: 0.015,
-        saturation: 1.2,
-      ),
-      horizontalPadding: 12,
-      verticalPadding: 6,
-      barHeight: 64,
-      tabWidth: 136,
-      selectedIconColor: const Color(0xFFF4F4F2),
-      unselectedIconColor: const Color(0xFF8B8B8B),
-      indicatorColor: const Color(0xFF242424).withOpacity(0.85),
-      interactionBehavior: GlassInteractionBehavior.full,
-      tabs: [
-        GlassTab(
-          icon: const _NavItemLabel(
-            icon: CupertinoIcons.house,
-            label: "HOME",
-            isSelected: false,
-          ),
-          activeIcon: const _NavItemLabel(
-            icon: CupertinoIcons.house_fill,
-            label: "HOME",
-            isSelected: true,
-          ),
-        ),
-
-        GlassTab(
-          icon: const _NavItemLabel(
-            icon: CupertinoIcons.flag,
-            label: "MY RIDES",
-            isSelected: false,
-          ),
-          activeIcon: const _NavItemLabel(
-            icon: CupertinoIcons.flag_fill,
-            label: "MY RIDES",
-            isSelected: true,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _NavItemLabel extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isSelected;
-
-  const _NavItemLabel({
-    required this.icon,
-    required this.label,
-    required this.isSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = isSelected
-        ? const Color(0xFFF4F4F2)
-        : const Color(0xFF8B8B8B);
-
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Icon(icon, size: 18, color: color),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: TextStyle(
-            color: color,
-            fontSize: 11,
-            letterSpacing: 2,
-            fontWeight: isSelected ? FontWeight.w500 : FontWeight.w400,
-          ),
-        ),
-      ],
     );
   }
 }
@@ -175,7 +104,7 @@ class _HomePageState extends State<HomePage>
   final RideService _rideService = RideService();
   final WeatherService _weatherService = WeatherService();
 
-  WeatherCondition _weatherCondition = WeatherCondition.clearDark;
+  WeatherData? _weather;
   bool _isLoadingWeather = false;
   bool _isCreatingRide = false;
   bool _isJoiningRide = false;
@@ -203,17 +132,36 @@ class _HomePageState extends State<HomePage>
     _animController.forward();
   }
 
+  /// Weather refresh with guaranteed minimum execution time for visual feedback
   Future<void> _loadWeather() async {
     if (!mounted) return;
+
     setState(() => _isLoadingWeather = true);
 
-    final condition = await _weatherService.fetchCurrentWeatherCondition();
-
-    if (!mounted) return;
-    setState(() {
-      _weatherCondition = condition;
-      _isLoadingWeather = false;
-    });
+    try {
+      await Future.wait([
+        _weatherService.fetchCurrentWeather().then((weather) {
+          if (mounted) {
+            setState(() => _weather = weather);
+          }
+        }),
+        // Holds spinner open for at least 800ms so pull interaction feels smooth
+        Future.delayed(const Duration(milliseconds: 800)),
+      ]);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Weather Sync Failed: $e'),
+          backgroundColor: const Color(0xFF161616),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingWeather = false);
+      }
+    }
   }
 
   @override
@@ -248,114 +196,15 @@ class _HomePageState extends State<HomePage>
   }
 
   Future<void> _showJoinRideDialog() async {
-    final controller = TextEditingController();
+    final rideId = await showJoinRideDialog(context);
 
-    final rideId = await showGeneralDialog<String>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: "Join",
-      barrierColor: Colors.black.withValues(alpha: 0.85),
-      transitionDuration: const Duration(milliseconds: 220),
-      pageBuilder: (_, __, ___) {
-        return Scaffold(
-          backgroundColor: const Color(0xFF0A0A0A),
-          body: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(28, 20, 28, 28),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          "JOIN GROUP",
-                          style: TextStyle(
-                            color: Color(0xFFF4F4F2),
-                            fontSize: 16,
-                            letterSpacing: 4,
-                            fontWeight: FontWeight.w300,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: const Icon(Icons.close, color: Color(0xFFF4F4F2)),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 40),
-                  Container(
-                    width: 48,
-                    height: 1,
-                    color: const Color(0xFFF4F4F2),
-                  ),
-                  const SizedBox(height: 32),
-                  const Text(
-                    "Enter your\ninvitation code.",
-                    style: TextStyle(
-                      color: Color(0xFFF4F4F2),
-                      fontSize: 40,
-                      height: 1.05,
-                      fontWeight: FontWeight.w300,
-                    ),
-                  ),
-                  const SizedBox(height: 56),
-                  TextField(
-                    controller: controller,
-                    autofocus: true,
-                    style: const TextStyle(
-                      color: Color(0xFFF4F4F2),
-                      fontSize: 28,
-                      letterSpacing: 6,
-                      fontWeight: FontWeight.w300,
-                    ),
-                    decoration: const InputDecoration(
-                      hintText: "OT-XXXXXX",
-                      hintStyle: TextStyle(
-                        color: Colors.white24,
-                        letterSpacing: 6,
-                      ),
-                      enabledBorder: UnderlineInputBorder(
-                        borderSide: BorderSide(color: Color(0xFF242424)),
-                      ),
-                      focusedBorder: UnderlineInputBorder(
-                        borderSide: BorderSide(color: Color(0xFFF4F4F2)),
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 58,
-                    child: OutlinedButton(
-                      onPressed: () =>
-                          Navigator.pop(context, controller.text.trim()),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFF4F4F2),
-                        side: const BorderSide(color: Color(0xFF242424)),
-                        backgroundColor: const Color(0xFF111111),
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.zero,
-                        ),
-                      ),
-                      child: const Text(
-                        "JOIN GROUP",
-                        style: TextStyle(letterSpacing: 3),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
-    );
+    if (!mounted) return;
 
-    if (rideId != null && rideId.isNotEmpty) {
-      _joinRide(rideId);
+    if (rideId == null || rideId.trim().isEmpty) {
+      return;
     }
+
+    await _joinRide(rideId.trim());
   }
 
   Future<void> _joinRide(String rideId) async {
@@ -386,148 +235,104 @@ class _HomePageState extends State<HomePage>
   @override
   Widget build(BuildContext context) {
     return GlassPage(
-      background: DynamicWeatherBackground(condition: _weatherCondition),
+      background: DynamicWeatherBackground(
+        condition: _weather?.condition ?? WeatherCondition.clearDark,
+      ),
       child: Scaffold(
         backgroundColor: Colors.transparent,
         body: SafeArea(
+          bottom: false,
           child: RefreshIndicator(
-            onRefresh: _loadWeather,
             color: const Color(0xFFF4F4F2),
             backgroundColor: const Color(0xFF161616),
-            child: SingleChildScrollView(
+            strokeWidth: 2.0,
+            displacement: 40.0,
+            onRefresh: _loadWeather,
+            child: CustomScrollView(
               physics: const AlwaysScrollableScrollPhysics(
                 parent: BouncingScrollPhysics(),
               ),
-              padding: const EdgeInsets.fromLTRB(24, 20, 24, 110),
-              child: FadeTransition(
-                opacity: _fadeIn,
-                child: SlideTransition(
-                  position: _slideUp,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Expanded(
-                            child: Text(
-                              "OPEN TRAIL",
-                              style: TextStyle(
-                                color: Color(0xFFF4F4F2),
-                                fontSize: 16,
-                                fontWeight: FontWeight.w300,
-                                letterSpacing: 6,
-                              ),
+              slivers: [
+                SliverPadding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 120),
+                  sliver: SliverToBoxAdapter(
+                    child: FadeTransition(
+                      opacity: _fadeIn,
+                      child: SlideTransition(
+                        position: _slideUp,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            HomeHeader(authService: _authService),
+
+                            const SizedBox(height: 26),
+
+                            GreetingSection(
+                              name:
+                                  _authService.currentUser?.displayName ??
+                                  "Rider",
                             ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const SettingsPage(),
+
+                            const SizedBox(height: 56),
+
+                            WeatherSummary(
+                              temperature: _weather?.temperature,
+                              description: _weather?.description ?? "",
+                              location: _weather?.location ?? "",
+                              isLoading: _isLoadingWeather,
+                            ),
+
+                            const SizedBox(width: 20),
+
+                            Row(
+                              children: [
+                                AnimatedContainer(
+                                  duration: const Duration(milliseconds: 300),
+                                  width: 6,
+                                  height: 6,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: _isLoadingWeather
+                                        ? const Color(0xFF8B8B8B)
+                                        : const Color(0xFF00E676),
+                                  ),
                                 ),
-                              );
-                            },
-                            child: CircleAvatar(
-                              radius: 18,
-                              backgroundColor: const Color(0xFF1A1A1A),
-                              backgroundImage:
-                                  _authService.currentUserPhotoUrl != null
-                                  ? NetworkImage(
-                                      _authService.currentUserPhotoUrl!,
-                                    )
-                                  : null,
-                              child: _authService.currentUserPhotoUrl == null
-                                  ? const Icon(
-                                      Icons.person_outline,
-                                      color: Color(0xFFF4F4F2),
-                                      size: 18,
-                                    )
-                                  : null,
+
+                                const SizedBox(width: 10),
+
+                                Text(
+                                  _isLoadingWeather
+                                      ? "SYNCING WEATHER..."
+                                      : "WEATHER SYNCED",
+                                  style: const TextStyle(
+                                    color: Color(0xFF8B8B8B),
+                                    fontSize: 10,
+                                    letterSpacing: 3,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ),
-                        ],
-                      ),
 
-                      const SizedBox(height: 56),
+                            const SizedBox(height: 26),
 
-                      Container(
-                        width: 40,
-                        height: 1,
-                        color: const Color(0xFFF4F4F2),
-                      ),
+                            const HeroSection(),
 
-                      const SizedBox(height: 32),
+                            const SizedBox(height: 28),
 
-                      const Text(
-                        "Begin a\nshared journey.",
-                        style: TextStyle(
-                          color: Color(0xFFF4F4F2),
-                          fontSize: 44,
-                          height: 1.05,
-                          fontWeight: FontWeight.w300,
-                          letterSpacing: -0.5,
+                            QuickActions(
+                              isCreating: _isCreatingRide,
+                              isJoining: _isJoiningRide,
+                              onCreate: _createRide,
+                              onJoin: _showJoinRideDialog,
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 20),
-                      const Text(
-                        "Create a group and explore\ntogether in real time.",
-                        style: TextStyle(
-                          color: Color(0xFF8B8B8B),
-                          fontSize: 16,
-                          height: 1.5,
-                          fontWeight: FontWeight.w400,
-                        ),
-                      ),
-
-                      const SizedBox(height: 56),
-                      Row(
-                        children: [
-                          AnimatedContainer(
-                            duration: const Duration(milliseconds: 300),
-                            width: 6,
-                            height: 6,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: _isLoadingWeather
-                                  ? const Color(0xFF8B8B8B)
-                                  : const Color(0xFFF4F4F2),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            _isLoadingWeather
-                                ? "SYNCING WEATHER..."
-                                : "WEATHER SYNCED",
-                            style: const TextStyle(
-                              color: Color(0xFF8B8B8B),
-                              fontSize: 10,
-                              letterSpacing: 3,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        ],
-                      ),
-
-                      const SizedBox(height: 28),
-
-                      OpentrailButton(
-                        number: "01",
-                        title: _isCreatingRide ? "CREATING..." : "CREATE GROUP",
-                        subtitle: "Start a new ride and invite others.",
-                        onTap: _isCreatingRide ? null : _createRide,
-                      ),
-                      const SizedBox(height: 16),
-                      OpentrailButton(
-                        number: "02",
-                        title: _isJoiningRide ? "JOINING..." : "JOIN GROUP",
-                        subtitle: "Enter an invitation code to join.",
-                        onTap: _isJoiningRide ? null : _showJoinRideDialog,
-                      ),
-                    ],
+                    ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         ),
@@ -579,7 +384,6 @@ class _MyRidesPageState extends State<MyRidesPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Screen Header
               const Text(
                 "MY RIDES",
                 style: TextStyle(
@@ -592,7 +396,6 @@ class _MyRidesPageState extends State<MyRidesPage> {
 
               const SizedBox(height: 24),
 
-              // Glass Segmented Selector
               RideSegmentSelector(
                 selectedIndex: _selectedSegment,
                 onSegmentSelected: _onSegmentChanged,
@@ -600,7 +403,6 @@ class _MyRidesPageState extends State<MyRidesPage> {
 
               const SizedBox(height: 24),
 
-              // Tab View Content
               Expanded(
                 child: PageView(
                   controller: _pageController,
@@ -629,115 +431,6 @@ class _MyRidesPageState extends State<MyRidesPage> {
   }
 }
 
-class RideSegmentSelector extends StatelessWidget {
-  final int selectedIndex;
-  final ValueChanged<int> onSegmentSelected;
-
-  const RideSegmentSelector({
-    super.key,
-    required this.selectedIndex,
-    required this.onSegmentSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(24),
-      child: BackdropFilter(
-        filter: ui.ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          height: 46,
-          padding: const EdgeInsets.all(4),
-          decoration: BoxDecoration(
-            color: const Color(0xFF141414).withValues(alpha: 0.8),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: const Color(0xFF242424), width: 1),
-          ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final segmentWidth = constraints.maxWidth / 2;
-
-              return Stack(
-                children: [
-                  // Smooth Glass Capsule Background
-                  AnimatedPositioned(
-                    duration: const Duration(milliseconds: 220),
-                    curve: Curves.easeOutCubic,
-                    left: selectedIndex * segmentWidth,
-                    top: 0,
-                    bottom: 0,
-                    width: segmentWidth,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF262626),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: const Color(0xFF383838),
-                          width: 1,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Segment Titles
-                  Row(
-                    children: [
-                      Expanded(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => onSegmentSelected(0),
-                          child: Center(
-                            child: AnimatedDefaultTextStyle(
-                              duration: const Duration(milliseconds: 200),
-                              style: TextStyle(
-                                color: selectedIndex == 0
-                                    ? const Color(0xFFF4F4F2)
-                                    : const Color(0xFF8B8B8B),
-                                fontSize: 12,
-                                fontWeight: selectedIndex == 0
-                                    ? FontWeight.w500
-                                    : FontWeight.w400,
-                                letterSpacing: 2,
-                              ),
-                              child: const Text("CREATED"),
-                            ),
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.opaque,
-                          onTap: () => onSegmentSelected(1),
-                          child: Center(
-                            child: AnimatedDefaultTextStyle(
-                              duration: const Duration(milliseconds: 200),
-                              style: TextStyle(
-                                color: selectedIndex == 1
-                                    ? const Color(0xFFF4F4F2)
-                                    : const Color(0xFF8B8B8B),
-                                fontSize: 12,
-                                fontWeight: selectedIndex == 1
-                                    ? FontWeight.w500
-                                    : FontWeight.w400,
-                                letterSpacing: 2,
-                              ),
-                              child: const Text("JOINED"),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _RidesListStream extends StatefulWidget {
   final Stream<List<dynamic>> stream;
   final String emptyMessage;
@@ -758,6 +451,12 @@ class _RidesListStreamState extends State<_RidesListStream>
   @override
   bool get wantKeepAlive => true;
 
+  Future<void> _handleManualRefresh() async {
+    // Provide tactile delay on stream manual pulls
+    await Future.delayed(const Duration(milliseconds: 600));
+    if (mounted) setState(() {});
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
@@ -776,200 +475,36 @@ class _RidesListStreamState extends State<_RidesListStream>
 
         final rides = snapshot.data ?? [];
 
-        if (rides.isEmpty) {
-          return ListView(
-            key: PageStorageKey('${widget.storageKey}_empty'),
+        return RefreshIndicator(
+          color: const Color(0xFFF4F4F2),
+          backgroundColor: const Color(0xFF161616),
+          strokeWidth: 2.0,
+          onRefresh: _handleManualRefresh,
+          child: CustomScrollView(
+            key: PageStorageKey('${widget.storageKey}_scroll'),
             physics: const AlwaysScrollableScrollPhysics(
               parent: BouncingScrollPhysics(),
             ),
-            children: [
-              SizedBox(
-                height: 360,
-                child: _EmptyRidesState(message: widget.emptyMessage),
-              ),
-            ],
-          );
-        }
-
-        return ListView.builder(
-          key: PageStorageKey('${widget.storageKey}_list'),
-          physics: const AlwaysScrollableScrollPhysics(
-            parent: BouncingScrollPhysics(),
-          ),
-          padding: const EdgeInsets.only(bottom: 110),
-          itemCount: rides.length,
-          itemBuilder: (context, index) {
-            return _RideCard(ride: rides[index]);
-          },
-        );
-      },
-    );
-  }
-}
-
-class _RideCard extends StatefulWidget {
-  final dynamic ride;
-
-  const _RideCard({required this.ride});
-
-  @override
-  State<_RideCard> createState() => _RideCardState();
-}
-
-class _RideCardState extends State<_RideCard> {
-  bool _isPressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final bool active = widget.ride.isNavigating ?? false;
-    final destination = (widget.ride.destination as String?)?.trim();
-    final destinationLabel = destination == null || destination.isEmpty
-        ? "No destination set"
-        : destination;
-
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (_) => setState(() => _isPressed = true),
-        onTapUp: (_) => setState(() => _isPressed = false),
-        onTapCancel: () => setState(() => _isPressed = false),
-        onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => MapPage(
-                rideDocumentId: widget.ride.documentId,
-                initialRide: widget.ride,
-              ),
-            ),
-          );
-        },
-        child: AnimatedScale(
-          scale: _isPressed ? 0.98 : 1.0,
-          duration: const Duration(milliseconds: 140),
-          curve: Curves.easeOut,
-          child: GlassCard(
-            shape: LiquidRoundedRectangle(borderRadius: 1),
-            padding: const EdgeInsets.all(22),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      widget.ride.rideId ?? "UNKNOWN ID",
-                      style: const TextStyle(
-                        color: Color(0xFFF4F4F2),
-                        fontSize: 14,
-                        fontWeight: FontWeight.w400,
-                        letterSpacing: 2,
-                      ),
+            slivers: [
+              if (rides.isEmpty)
+                SliverFillRemaining(
+                  hasScrollBody: false,
+                  child: EmptyRidesState(message: widget.emptyMessage),
+                )
+              else
+                SliverPadding(
+                  padding: const EdgeInsets.only(bottom: 120),
+                  sliver: SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) => RideCard(ride: rides[index]),
+                      childCount: rides.length,
                     ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: active
-                            ? const Color(0xFF1C3A27)
-                            : const Color(0xFF1A1A1A),
-                        borderRadius: BorderRadius.circular(2),
-                        border: Border.all(
-                          color: active
-                              ? const Color(0xFF2A5E3F)
-                              : const Color(0xFF2B2B2B),
-                        ),
-                      ),
-                      child: Text(
-                        active ? "ACTIVE" : "ENDED",
-                        style: TextStyle(
-                          color: active
-                              ? const Color(0xFF52C47C)
-                              : const Color(0xFF8B8B8B),
-                          fontSize: 10,
-                          fontWeight: FontWeight.w500,
-                          letterSpacing: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 18),
-                Text(
-                  destinationLabel,
-                  style: const TextStyle(
-                    color: Color(0xFFF4F4F2),
-                    fontSize: 22,
-                    fontWeight: FontWeight.w300,
                   ),
                 ),
-                const SizedBox(height: 24),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.person_outline,
-                      size: 14,
-                      color: Color(0xFF8B8B8B),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      widget.ride.leaderName ?? "Unknown Leader",
-                      style: const TextStyle(
-                        color: Color(0xFF8B8B8B),
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(width: 24),
-                    const Icon(
-                      Icons.people_outline,
-                      size: 14,
-                      color: Color(0xFF8B8B8B),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      "${widget.ride.memberCount ?? 1} members",
-                      style: const TextStyle(
-                        color: Color(0xFF8B8B8B),
-                        fontSize: 13,
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+            ],
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _EmptyRidesState extends StatelessWidget {
-  final String message;
-  const _EmptyRidesState({required this.message});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Icon(Icons.explore_outlined, color: Color(0xFF242424), size: 48),
-        const SizedBox(height: 16),
-        Text(
-          message,
-          textAlign: TextAlign.center,
-          style: const TextStyle(
-            color: Color(0xFF8B8B8B),
-            fontSize: 14,
-            height: 1.5,
-            fontWeight: FontWeight.w300,
-            letterSpacing: 0.5,
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 }
