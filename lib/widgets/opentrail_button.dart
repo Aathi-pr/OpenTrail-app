@@ -1,42 +1,12 @@
 import 'package:flutter/material.dart';
 
-// class OpentrailButton extends StatelessWidget {
-//   final String text;
-//   final VoidCallback? onPressed;
-
-//   const OpentrailButton({super.key, required this.text, required this.onPressed});
-
-//   @override
-//   Widget build(BuildContext context) {
-//     return SizedBox(
-//       width: MediaQuery.of(context).size.width * 0.9,
-//       height: 46,
-//       child: OutlinedButton(
-//         onPressed: onPressed,
-//         style: OutlinedButton.styleFrom(
-//           elevation: 0,
-//           backgroundColor: Colors.white70,
-//           foregroundColor: const Color(0xFFF5F5F2),
-//           side: const BorderSide(color: Colors.white30, width: 1),
-//           shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
-//         ),
-//         child: Text(
-//           text,
-//           style: const TextStyle(letterSpacing: 2, fontWeight: FontWeight.w300, color: Colors.black),
-//         ),
-//       ),
-//     );
-//   }
-// }
-
-
 class OpentrailButton extends StatelessWidget {
   final String number;
   final String title;
   final String subtitle;
   final VoidCallback? onTap;
 
-  const OpentrailButton({super.key, 
+  const OpentrailButton({super.key,
     required this.number,
     required this.title,
     required this.subtitle,
@@ -58,6 +28,7 @@ class OpentrailButton extends StatelessWidget {
           decoration: BoxDecoration(
             color: card,
             border: Border.all(color: border),
+            borderRadius: BorderRadius.circular(6)
           ),
           child: Padding(
             padding: const EdgeInsets.all(22),

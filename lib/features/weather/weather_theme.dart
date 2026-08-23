@@ -32,13 +32,12 @@ class WeatherTheme {
 
   static WeatherTheme of(WeatherCondition condition) {
     switch (condition) {
-      // --- CLEAR STATES ---
       case WeatherCondition.clearDay:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF3A1C00), // Soft Amber Warmth
-            Color(0xFF1E0E00), // Warm Dark Shadow
-            Color(0xFF0A0A0A), // Pitch Black Base
+            Color(0xFF3A1C00),
+            Color(0xFF1E0E00),
+            Color(0xFF0A0A0A),
           ],
           ambientSweep: Color(0x33FF9100),
           showSunGlow: true,
@@ -47,7 +46,7 @@ class WeatherTheme {
       case WeatherCondition.clearDark:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF1B202D), // Deep Midnight Indigo Tint
+            Color(0xFF1B202D),
             Color(0xFF10131C),
             Color(0xFF0A0A0A),
           ],
@@ -55,11 +54,10 @@ class WeatherTheme {
           showMoonGlow: true,
         );
 
-      // --- CLOUD STATES ---
       case WeatherCondition.partlyCloudyDay:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF2E2219), // Dusky Amber Slate
+            Color(0xFF2E2219),
             Color(0xFF18120D),
             Color(0xFF0A0A0A),
           ],
@@ -71,7 +69,7 @@ class WeatherTheme {
       case WeatherCondition.partlyCloudyNight:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF181F2B), // Deep Cosmic Indigo
+            Color(0xFF181F2B),
             Color(0xFF0F141D),
             Color(0xFF0A0A0A),
           ],
@@ -83,7 +81,7 @@ class WeatherTheme {
       case WeatherCondition.cloudy:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF1E282D), // Soft Blue-Grey Tint
+            Color(0xFF1E282D),
             Color(0xFF11171A),
             Color(0xFF0A0A0A),
           ],
@@ -94,7 +92,7 @@ class WeatherTheme {
       case WeatherCondition.overcast:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF1A1E21), // Muted Low-Light Lead
+            Color(0xFF1A1E21),
             Color(0xFF0F1214),
             Color(0xFF0A0A0A),
           ],
@@ -102,11 +100,10 @@ class WeatherTheme {
           showClouds: true,
         );
 
-      // --- PRECIPITATION STATES ---
       case WeatherCondition.drizzle:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF1B242A), // Soft Moist Slate
+            Color(0xFF1B242A),
             Color(0xFF10161A),
             Color(0xFF0A0A0A),
           ],
@@ -118,8 +115,8 @@ class WeatherTheme {
       case WeatherCondition.rainy:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF1C252A), // Slate Grey Gradient Top
-            Color(0xFF10171A), // Dark Slate Shadow
+            Color(0xFF1C252A),
+            Color(0xFF10171A),
             Color(0xFF0A0A0A),
           ],
           ambientSweep: Color(0x2278909C),
@@ -130,7 +127,7 @@ class WeatherTheme {
       case WeatherCondition.heavyRain:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF131B21), // Deep Steel Dark
+            Color(0xFF131B21),
             Color(0xFF0B1014),
             Color(0xFF0A0A0A),
           ],
@@ -142,8 +139,8 @@ class WeatherTheme {
       case WeatherCondition.thunderstorm:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF1A122B), // Storm Electric Indigo Top
-            Color(0xFF0E0B1A), // Deep Storm Base
+            Color(0xFF1A122B),
+            Color(0xFF0E0B1A),
             Color(0xFF0A0A0A),
           ],
           ambientSweep: Color(0x33512DA8),
@@ -152,11 +149,10 @@ class WeatherTheme {
           showClouds: true,
         );
 
-      // --- WINTER STATES ---
       case WeatherCondition.snowy:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF1C2530), // Cool Frost Tint
+            Color(0xFF1C2530),
             Color(0xFF10161D),
             Color(0xFF0A0A0A),
           ],
@@ -168,7 +164,7 @@ class WeatherTheme {
       case WeatherCondition.sleet:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF1A232A), // Icy Blue-Grey
+            Color(0xFF1A232A),
             Color(0xFF0F151A),
             Color(0xFF0A0A0A),
           ],
@@ -181,7 +177,7 @@ class WeatherTheme {
       case WeatherCondition.hail:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF181E24), // Harsh Cold Steel
+            Color(0xFF181E24),
             Color(0xFF0E1216),
             Color(0xFF0A0A0A),
           ],
@@ -192,11 +188,10 @@ class WeatherTheme {
           showClouds: true,
         );
 
-      // --- ATMOSPHERIC STATES ---
       case WeatherCondition.foggy:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF222629), // Diffused Low-Contrast Grey
+            Color(0xFF222629),
             Color(0xFF141719),
             Color(0xFF0A0A0A),
           ],
@@ -208,7 +203,7 @@ class WeatherTheme {
       case WeatherCondition.windy:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF1A262B), // Crisp Aerodynamic Teal-Grey
+            Color(0xFF1A262B),
             Color(0xFF0F171A),
             Color(0xFF0A0A0A),
           ],
@@ -220,7 +215,7 @@ class WeatherTheme {
       case WeatherCondition.hazy:
         return const WeatherTheme(
           gradientColors: [
-            Color(0xFF28201A), // Warm Sepia-Dust Tint
+            Color(0xFF28201A),
             Color(0xFF16120E),
             Color(0xFF0A0A0A),
           ],

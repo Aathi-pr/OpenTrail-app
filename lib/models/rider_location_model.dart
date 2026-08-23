@@ -7,7 +7,7 @@ class RiderLocationModel {
     required this.role,
     required this.isOnline,
     this.isSOS = false,
-    this.photoUrl, // Added photoUrl
+    this.photoUrl,
     this.latitude,
     this.longitude,
     this.heading,
@@ -17,8 +17,8 @@ class RiderLocationModel {
 
   final String userId;
   final String displayName;
-  final String role; // 'leader' or 'member'
-  final String? photoUrl; // Google / User Profile Avatar URL
+  final String role;
+  final String? photoUrl;
   final double? latitude;
   final double? longitude;
   final double? heading;
@@ -39,7 +39,7 @@ class RiderLocationModel {
       userId: data['userId'] as String? ?? document.id,
       displayName: data['displayName'] as String? ?? 'Rider',
       role: data['role'] as String? ?? 'member',
-      photoUrl: data['photoUrl'] as String?, // Parsed from Firestore
+      photoUrl: data['photoUrl'] as String?,
       latitude: (data['latitude'] as num?)?.toDouble(),
       longitude: (data['longitude'] as num?)?.toDouble(),
       heading: (data['heading'] as num?)?.toDouble(),
@@ -60,7 +60,7 @@ class RiderLocationModel {
       userId: data["userId"] ?? userId,
       displayName: data["displayName"] ?? "Rider",
       role: data["role"] ?? "member",
-      photoUrl: data["photoUrl"] as String?, // Parsed from Realtime DB
+      photoUrl: data["photoUrl"] as String?,
       latitude: (data["latitude"] as num?)?.toDouble(),
       longitude: (data["longitude"] as num?)?.toDouble(),
       heading: (data["heading"] as num?)?.toDouble(),
@@ -73,7 +73,6 @@ class RiderLocationModel {
     );
   }
 
-  /// Helper to convert model to Map when writing to Firestore/Realtime DB
   Map<String, dynamic> toMap() {
     return {
       'userId': userId,

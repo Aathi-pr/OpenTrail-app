@@ -20,7 +20,6 @@ class WaypointService {
 
   String? get currentUserId => _auth.currentUser?.uid;
 
-  /// Adds a new waypoint to the ride subcollection
   Future<WaypointModel> addWaypoint({
     required String rideId,
     required WaypointModel waypoint,
@@ -49,7 +48,6 @@ class WaypointService {
     }
   }
 
-  /// Streams list of waypoints sorted by their order
   Stream<List<WaypointModel>> watchWaypoints(String rideId) {
     return _waypointCollection(rideId)
         .orderBy('order')
@@ -65,7 +63,6 @@ class WaypointService {
         });
   }
 
-  /// Updates an existing waypoint
   Future<void> updateWaypoint({
     required String rideId,
     required WaypointModel waypoint,
@@ -82,7 +79,6 @@ class WaypointService {
     }
   }
 
-  /// Deletes a waypoint by ID
   Future<void> deleteWaypoint({
     required String rideId,
     required String waypointId,
@@ -97,7 +93,6 @@ class WaypointService {
     }
   }
 
-  /// Toggles completed status of a waypoint
   Future<void> setWaypointCompleted({
     required String rideId,
     required String waypointId,
@@ -115,7 +110,6 @@ class WaypointService {
     }
   }
 
-  /// Calculates next order integer for new waypoints
   Future<int> _nextWaypointOrder(String rideId) async {
     final latestWaypoint = await _waypointCollection(
       rideId,
@@ -127,7 +121,6 @@ class WaypointService {
     return (data['order'] as int? ?? -1) + 1;
   }
 
-  /// Validates user is current ride leader
   Future<void> _requireLeader(String rideId, String userId) async {
     final snapshot = await _firestoreService.getRideDocument(rideId);
 

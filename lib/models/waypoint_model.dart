@@ -29,13 +29,10 @@ class WaypointModel {
   final double latitude;
   final double longitude;
 
-  /// Human-readable place name
   final String locationName;
 
-  /// Planned stop duration
   final int stopMinutes;
 
-  /// Order of this checkpoint in the ride
   final int order;
 
   final WaypointCategory category;
@@ -53,16 +50,22 @@ class WaypointModel {
     switch (category) {
       case WaypointCategory.food:
         return 'Food';
+
       case WaypointCategory.fuel:
         return 'Fuel';
+
       case WaypointCategory.hotel:
         return 'Hotel';
+
       case WaypointCategory.viewpoint:
         return 'Viewpoint';
+
       case WaypointCategory.rest:
         return 'Rest';
+
       case WaypointCategory.checkpoint:
         return 'Checkpoint';
+
       case WaypointCategory.custom:
         return 'Custom';
     }
@@ -72,16 +75,22 @@ class WaypointModel {
     switch (category) {
       case WaypointCategory.food:
         return Icons.restaurant;
+
       case WaypointCategory.fuel:
         return Icons.local_gas_station;
+
       case WaypointCategory.hotel:
         return Icons.hotel;
+
       case WaypointCategory.viewpoint:
         return Icons.camera_alt;
+
       case WaypointCategory.rest:
         return CupertinoIcons.bed_double_fill;
+
       case WaypointCategory.checkpoint:
         return Icons.flag;
+
       case WaypointCategory.custom:
         return Icons.place;
     }
@@ -91,16 +100,22 @@ class WaypointModel {
     switch (category) {
       case WaypointCategory.food:
         return Colors.orange;
+
       case WaypointCategory.fuel:
         return Colors.green;
+
       case WaypointCategory.hotel:
         return Colors.blue;
+
       case WaypointCategory.viewpoint:
         return Colors.purple;
+
       case WaypointCategory.rest:
         return Colors.teal;
+
       case WaypointCategory.checkpoint:
         return Colors.red;
+
       case WaypointCategory.custom:
         return Colors.white;
     }
@@ -109,9 +124,11 @@ class WaypointModel {
   factory WaypointModel.fromMap(Map<String, dynamic> data, {String id = ''}) {
     final categoryName =
         (data['category'] as String?) ?? (data['type'] as String?) ?? '';
+
     final createdAt = data['createdAt'];
 
     DateTime parsedDate;
+
     if (createdAt is Timestamp) {
       parsedDate = createdAt.toDate();
     } else if (createdAt is String) {
@@ -122,27 +139,39 @@ class WaypointModel {
 
     return WaypointModel(
       id: id.isNotEmpty ? id : (data['id'] as String? ?? ''),
+
       title: (data['title'] as String?) ?? (data['name'] as String?) ?? '',
+
       description: data['description'] as String? ?? '',
-      latitude: (data['latitude'] as num?)?.toDouble() ?? 0.0,
-      longitude: (data['longitude'] as num?)?.toDouble() ?? 0.0,
+
+      latitude: (data['latitude'] as num?)?.toDouble() ?? 0,
+
+      longitude: (data['longitude'] as num?)?.toDouble() ?? 0,
+
       locationName: data['locationName'] as String? ?? '',
-      stopMinutes: data['stopMinutes'] as int? ?? 0,
-      order: data['order'] as int? ?? 0,
+
+      stopMinutes: (data['stopMinutes'] as num?)?.toInt() ?? 0,
+
+      order: (data['order'] as num?)?.toInt() ?? 0,
+
       category: WaypointCategory.values.firstWhere(
         (entry) => entry.name == categoryName,
         orElse: () => WaypointCategory.custom,
       ),
+
       completed:
           (data['completed'] as bool?) ?? (data['isReached'] as bool?) ?? false,
+
       creatorId:
           (data['creatorId'] as String?) ??
           (data['createdBy'] as String?) ??
           '',
+
       creatorName:
           (data['creatorName'] as String?) ??
           (data['createdByName'] as String?) ??
           'Unknown rider',
+
       createdAt: parsedDate,
     );
   }

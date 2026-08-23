@@ -49,14 +49,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.13.1"
-  bloc:
-    dependency: transitive
-    description:
-      name: bloc
-      sha256: e03b235924e4f509c27b5d6b2f949200e0a91149a9818b4f65eeb56662b75413
-      url: "https://pub.dev"
-    source: hosted
-    version: "9.2.1"
   boolean_selector:
     dependency: transitive
     description:
@@ -161,6 +153,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
+  connectivity_plus:
+    dependency: "direct main"
+    description:
+      name: connectivity_plus
+      sha256: "762c99f890ca8bf87f7337236f99edd42793843bc6c3631da294a76653a54bd0"
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.3.1"
+  connectivity_plus_platform_interface:
+    dependency: transitive
+    description:
+      name: connectivity_plus_platform_interface
+      sha256: "3c09627c536d22fd24691a905cdd8b14520de69da52c7a97499c8be5284a32ed"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.1.0"
   convert:
     dependency: transitive
     description:
@@ -390,14 +398,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  flutter_bloc:
-    dependency: "direct main"
-    description:
-      name: flutter_bloc
-      sha256: cf51747952201a455a1c840f8171d273be009b932c75093020f9af64f2123e38
-      url: "https://pub.dev"
-    source: hosted
-    version: "9.1.1"
   flutter_compass:
     dependency: "direct main"
     description:
@@ -848,14 +848,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.1"
-  nested:
+  nm:
     dependency: transitive
     description:
-      name: nested
-      sha256: "03bac4c528c64c95c722ec99280375a6f2fc708eec17c7b3f07253b626cd2a20"
+      name: nm
+      sha256: "2c9aae4127bdc8993206464fcc063611e0e36e72018696cd9631023a31b24254"
       url: "https://pub.dev"
     source: hosted
-    version: "1.0.0"
+    version: "0.5.0"
   objective_c:
     dependency: transitive
     description:
@@ -1048,14 +1048,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"
-  provider:
-    dependency: transitive
-    description:
-      name: provider
-      sha256: "4e82183fa20e5ca25703ead7e05de9e4cceed1fbd1eadc1ac3cb6f565a09f272"
-      url: "https://pub.dev"
-    source: hosted
-    version: "6.1.5+1"
   pub_semver:
     dependency: transitive
     description:

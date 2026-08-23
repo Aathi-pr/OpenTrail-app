@@ -10,12 +10,16 @@ import 'package:open_trail/features/weather/weather_data.dart';
 
 class WeatherService {
   static final String _apiKey = dotenv.env['OPENWEATHER_API_KEY'] ?? '';
+
   static const String _baseUrl =
       'https://api.openweathermap.org/data/2.5/weather';
 
   final Duration _cacheDuration;
+
   WeatherData? _cachedWeather;
   DateTime? _lastFetchTime;
+
+  final Map<String, _WeatherCacheEntry> _destinationCache = {};
 
   WeatherService({Duration cacheDuration = const Duration(minutes: 15)})
     : _cacheDuration = cacheDuration;
@@ -31,16 +35,17 @@ class WeatherService {
   void clearCache() {
     _cachedWeather = null;
     _lastFetchTime = null;
+    _destinationCache.clear();
   }
 
   Future<Position> _determinePosition() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    final serviceEnabled = await Geolocator.isLocationServiceEnabled();
 
     if (!serviceEnabled) {
       throw Exception('Location services are disabled.');
     }
 
-    LocationPermission permission = await Geolocator.checkPermission();
+    var permission = await Geolocator.checkPermission();
 
     if (permission == LocationPermission.denied) {
       permission = await Geolocator.requestPermission();
@@ -67,54 +72,16 @@ class WeatherService {
     try {
       final position = await _determinePosition();
 
-      final url = Uri.parse(
-        '$_baseUrl'
-        '?lat=${position.latitude}'
-        '&lon=${position.longitude}'
-        '&appid=$_apiKey',
+      final weather = await fetchWeatherForCoordinates(
+        latitude: position.latitude,
+        longitude: position.longitude,
+        forceRefresh: forceRefresh,
       );
 
-      final response = await http.get(url);
+      _cachedWeather = weather;
+      _lastFetchTime = DateTime.now();
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-
-        final int conditionCode = data['weather'][0]['id'];
-        final String icon = data['weather'][0]['icon'];
-
-        final double windSpeed =
-            (data['wind']['speed'] as num?)?.toDouble() ?? 0;
-
-        final WeatherCondition condition = _mapConditionCodeToEnum(
-          code: conditionCode,
-          icon: icon,
-          windSpeed: windSpeed,
-        );
-
-        final weather = WeatherData(
-          condition: condition,
-          temperature: (data['main']['temp'] as num).toDouble() - 273.15,
-          feelsLike: (data['main']['feels_like'] as num).toDouble() - 273.15,
-          humidity: data['main']['humidity'] as int,
-          location: data['name'] ?? 'Unknown',
-          description: data['weather'][0]['description'] ?? 'Clear',
-        );
-
-        _cachedWeather = weather;
-        _lastFetchTime = DateTime.now();
-
-        return weather;
-      }
-
-      return _cachedWeather ??
-          const WeatherData(
-            condition: WeatherCondition.clearDark,
-            temperature: 0,
-            feelsLike: 0,
-            humidity: 0,
-            location: 'Unknown',
-            description: 'Unavailable',
-          );
+      return weather;
     } catch (e) {
       debugPrint('Weather Service Error: $e');
 
@@ -130,12 +97,92 @@ class WeatherService {
     }
   }
 
+  Future<WeatherData> fetchWeatherForCoordinates({
+    required double latitude,
+    required double longitude,
+    bool forceRefresh = false,
+  }) async {
+    final cacheKey =
+        '${latitude.toStringAsFixed(3)},'
+        '${longitude.toStringAsFixed(3)}';
+
+    final cached = _destinationCache[cacheKey];
+
+    if (!forceRefresh &&
+        cached != null &&
+        DateTime.now().difference(cached.fetchedAt) < _cacheDuration) {
+      return cached.weather;
+    }
+
+    try {
+      if (_apiKey.isEmpty) {
+        throw Exception('OPENWEATHER_API_KEY is not configured.');
+      }
+
+      final url = Uri.parse(
+        '$_baseUrl'
+        '?lat=$latitude'
+        '&lon=$longitude'
+        '&appid=$_apiKey',
+      );
+
+      final response = await http.get(url);
+
+      if (response.statusCode != 200) {
+        throw Exception('OpenWeather request failed: ${response.statusCode}');
+      }
+
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
+
+      final weatherData = data['weather'][0] as Map<String, dynamic>;
+
+      final conditionCode = weatherData['id'] as int;
+
+      final icon = weatherData['icon'] as String;
+
+      final windSpeed = (data['wind']['speed'] as num?)?.toDouble() ?? 0;
+
+      final condition = _mapConditionCodeToEnum(
+        code: conditionCode,
+        icon: icon,
+        windSpeed: windSpeed,
+      );
+
+      final weather = WeatherData(
+        condition: condition,
+        temperature: (data['main']['temp'] as num).toDouble() - 273.15,
+        feelsLike: (data['main']['feels_like'] as num).toDouble() - 273.15,
+        humidity: (data['main']['humidity'] as num).toInt(),
+        location: data['name'] as String? ?? 'Unknown',
+        description: weatherData['description'] as String? ?? 'Clear',
+      );
+
+      _destinationCache[cacheKey] = _WeatherCacheEntry(
+        weather: weather,
+        fetchedAt: DateTime.now(),
+      );
+
+      return weather;
+    } catch (e) {
+      debugPrint('Destination Weather Error: $e');
+
+      return const WeatherData(
+        condition: WeatherCondition.clearDark,
+        temperature: 0,
+        feelsLike: 0,
+        humidity: 0,
+        location: 'Unknown',
+        description: 'Unavailable',
+      );
+    }
+  }
+
   WeatherCondition _mapConditionCodeToEnum({
     required int code,
     required String icon,
     required double windSpeed,
   }) {
-    final bool isNight = icon.endsWith('n');
+    final isNight = icon.endsWith('n');
 
     if (code == 771 || code == 781 || windSpeed > 10.8) {
       return WeatherCondition.windy;
@@ -150,7 +197,9 @@ class WeatherService {
     }
 
     if (code >= 500 && code < 600) {
-      if (code == 511) return WeatherCondition.sleet;
+      if (code == 511) {
+        return WeatherCondition.sleet;
+      }
 
       if (code == 502 ||
           code == 503 ||
@@ -203,4 +252,11 @@ class WeatherService {
 
     return isNight ? WeatherCondition.clearDark : WeatherCondition.clearDay;
   }
+}
+
+class _WeatherCacheEntry {
+  const _WeatherCacheEntry({required this.weather, required this.fetchedAt});
+
+  final WeatherData weather;
+  final DateTime fetchedAt;
 }

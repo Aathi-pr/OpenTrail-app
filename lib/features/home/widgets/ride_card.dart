@@ -45,7 +45,7 @@ class RideCardState extends State<RideCard> {
           duration: const Duration(milliseconds: 140),
           curve: Curves.easeOut,
           child: GlassCard(
-            shape: LiquidRoundedRectangle(borderRadius: 1),
+            shape: LiquidRoundedRectangle(borderRadius: 6),
             padding: const EdgeInsets.all(22),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -71,7 +71,7 @@ class RideCardState extends State<RideCard> {
                         color: active
                             ? const Color(0xFF1C3A27)
                             : const Color(0xFF1A1A1A),
-                        borderRadius: BorderRadius.circular(2),
+                        borderRadius: BorderRadius.circular(6),
                         border: Border.all(
                           color: active
                               ? const Color(0xFF2A5E3F)

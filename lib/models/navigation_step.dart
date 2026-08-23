@@ -1,8 +1,12 @@
 class NavigationStep {
   final String instruction;
+
   final double distance;
+
   final double duration;
+
   final int type;
+
   final int waypointIndex;
 
   const NavigationStep({
