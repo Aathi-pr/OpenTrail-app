@@ -47,7 +47,7 @@ OpenTrail is a Flutter application built for coordinating motorcycle and cycling
 Clone the repository.
 
 ```bash
-git clone https://github.com/<your-username>/OpenTrail.git
+git clone https://github.com/Aathi-pr/OpenTrail.git
 cd OpenTrail
 ```
 
