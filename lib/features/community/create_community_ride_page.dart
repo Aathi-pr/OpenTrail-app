@@ -2008,7 +2008,7 @@ class _ToggleTile extends StatelessWidget {
           Switch.adaptive(
             value: value,
             onChanged: onChanged,
-            activeColor: const Color(0xFFF4F4F2),
+            activeThumbColor: const Color(0xFFF4F4F2),
             activeTrackColor: const Color(0xFF444444),
           ),
         ],
@@ -2182,7 +2182,7 @@ class _VisibilitySelector extends StatelessWidget {
           Switch.adaptive(
             value: isPublic,
             onChanged: onChanged,
-            activeColor: const Color(0xFFF4F4F2),
+            activeThumbColor: const Color(0xFFF4F4F2),
             activeTrackColor: const Color(0xFF444444),
           ),
         ],

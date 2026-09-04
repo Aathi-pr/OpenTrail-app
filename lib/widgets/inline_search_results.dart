@@ -23,10 +23,10 @@ class InlineSearchResults extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFF09090B),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.12), width: 1),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.12), width: 1),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.5),
+            color: Colors.black.withValues(alpha: 0.5),
             blurRadius: 20,
             offset: const Offset(0, 10),
           ),
@@ -70,10 +70,10 @@ class InlineSearchResults extends StatelessWidget {
               physics: const BouncingScrollPhysics(),
               padding: EdgeInsets.zero,
               itemCount: places.length,
-              separatorBuilder: (_, __) => Divider(
+              separatorBuilder: (_, _) => Divider(
                 height: 1,
                 thickness: 1,
-                color: Colors.white.withOpacity(0.06),
+                color: Colors.white.withValues(alpha: 0.06),
               ),
               itemBuilder: (context, index) {
                 final place = places[index] as Map<String, dynamic>;
@@ -118,8 +118,8 @@ class InlineSearchResults extends StatelessWidget {
                 }
 
                 return InkWell(
-                  splashColor: Colors.white.withOpacity(0.08),
-                  highlightColor: Colors.white.withOpacity(0.04),
+                  splashColor: Colors.white.withValues(alpha: 0.08),
+                  highlightColor: Colors.white.withValues(alpha: 0.04),
                   onTap: () {
                     onPlaceSelected(LatLng(lat, lon), title);
                   },

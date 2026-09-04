@@ -245,7 +245,7 @@ class _FloatingControlBarState extends State<FloatingControlBar> {
 
         unselectedIconColor: CupertinoColors.white,
 
-        indicatorColor: CupertinoColors.white.withOpacity(.12),
+        indicatorColor: CupertinoColors.white.withValues(alpha: 0.12),
 
         interactionBehavior: GlassInteractionBehavior.full,
 
@@ -370,7 +370,7 @@ class _SosHoldButtonState extends State<_SosHoldButton>
                       shape: BoxShape.circle,
                       boxShadow: [
                         BoxShadow(
-                          color: CupertinoColors.systemRed.withOpacity(
+                          color: CupertinoColors.systemRed.withValues(alpha:
                             0.5 * progress,
                           ),
                           blurRadius: 12,
@@ -387,7 +387,7 @@ class _SosHoldButtonState extends State<_SosHoldButton>
                     child: CircularProgressIndicator(
                       value: 1.0,
                       strokeWidth: 3.5,
-                      color: CupertinoColors.systemRed.withOpacity(0.25),
+                      color: CupertinoColors.systemRed.withValues(alpha: 0.25),
                     ),
                   ),
 

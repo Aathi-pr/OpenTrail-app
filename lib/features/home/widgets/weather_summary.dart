@@ -84,7 +84,7 @@ class _WeatherSummarySkeleton extends StatelessWidget {
           width: 120,
           height: 68,
           decoration: BoxDecoration(
-            color: const Color(0xFF1C1C1E).withOpacity(0.6),
+            color: const Color(0xFF1C1C1E).withValues(alpha: 0.6),
             borderRadius: BorderRadius.circular(12),
           ),
         ),
@@ -96,7 +96,7 @@ class _WeatherSummarySkeleton extends StatelessWidget {
           width: 190,
           height: 14,
           decoration: BoxDecoration(
-            color: const Color(0xFF1C1C1E).withOpacity(0.4),
+            color: const Color(0xFF1C1C1E).withValues(alpha: 0.4),
             borderRadius: BorderRadius.circular(4),
           ),
         ),

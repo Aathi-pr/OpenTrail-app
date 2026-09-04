@@ -9,7 +9,7 @@ Future<String?> showJoinRideDialog(BuildContext context) async {
     barrierLabel: "Join",
     barrierColor: Colors.black.withValues(alpha: 0.85),
     transitionDuration: const Duration(milliseconds: 220),
-    pageBuilder: (_, __, ___) {
+    pageBuilder: (_, _, _) {
       return Scaffold(
         backgroundColor: const Color(0xFF0A0A0A),
         body: SafeArea(

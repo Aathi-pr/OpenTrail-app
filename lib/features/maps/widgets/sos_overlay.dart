@@ -127,7 +127,7 @@ class _SOSOverlayState extends State<SOSOverlay> with TickerProviderStateMixin {
           child: IgnorePointer(
             child: AnimatedBuilder(
               animation: Listenable.merge([_revealAnimation, _timeNotifier]),
-              builder: (_, __) {
+              builder: (_, _) {
                 return CustomPaint(
                   painter: _SOSPainter(
                     shader: _shader!,
@@ -175,7 +175,7 @@ class _SOSOverlayState extends State<SOSOverlay> with TickerProviderStateMixin {
                           alignment: Alignment.center,
                           children: [
                             ...previousChildren,
-                            if (currentChild != null) currentChild,
+                            ?currentChild,
                           ],
                         );
                       },

@@ -134,7 +134,7 @@ class _ManageCommunityRidePageState extends State<ManageCommunityRidePage> {
                     width: 18,
                     height: 18,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const Icon(
+                    errorBuilder: (_, _, _) => const Icon(
                       CupertinoIcons.person_fill,
                       size: 11,
                       color: Color(0xFF00E676),

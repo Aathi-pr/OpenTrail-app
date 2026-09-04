@@ -145,7 +145,6 @@ class RideModel {
   Map<String, dynamic> toFirestore() {
     return {
       'rideId': rideId,
-
       'leaderId': leaderId,
 
       'leaderName': leaderName,

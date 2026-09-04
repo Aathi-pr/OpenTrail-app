@@ -29,10 +29,10 @@ class WaypointInfoSheet extends StatelessWidget {
           decoration: BoxDecoration(
             color: const Color(0xFF09090B),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: Colors.white.withOpacity(0.14), width: 1),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.14), width: 1),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.7),
+                color: Colors.black.withValues(alpha: 0.7),
                 blurRadius: 30,
                 offset: const Offset(0, 10),
               ),
@@ -51,7 +51,7 @@ class WaypointInfoSheet extends StatelessWidget {
                       width: 36,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.25),
+                        color: Colors.white.withValues(alpha: 0.25),
                         borderRadius: BorderRadius.circular(1),
                       ),
                     ),
@@ -70,10 +70,10 @@ class WaypointInfoSheet extends StatelessWidget {
                             width: 44,
                             height: 44,
                             decoration: BoxDecoration(
-                              color: waypoint.categoryColor.withOpacity(0.18),
+                              color: waypoint.categoryColor.withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(1),
                               border: Border.all(
-                                color: waypoint.categoryColor.withOpacity(0.4),
+                                color: waypoint.categoryColor.withValues(alpha: 0.4),
                                 width: 1,
                               ),
                             ),
@@ -162,13 +162,13 @@ class WaypointInfoSheet extends StatelessWidget {
                     ),
                     decoration: BoxDecoration(
                       color: waypoint.completed
-                          ? const Color(0xFF10B981).withOpacity(0.15)
-                          : Colors.white.withOpacity(0.06),
+                          ? const Color(0xFF10B981).withValues(alpha: 0.15)
+                          : Colors.white.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(1),
                       border: Border.all(
                         color: waypoint.completed
-                            ? const Color(0xFF10B981).withOpacity(0.4)
-                            : Colors.white.withOpacity(0.12),
+                            ? const Color(0xFF10B981).withValues(alpha: 0.4)
+                            : Colors.white.withValues(alpha: 0.12),
                       ),
                     ),
                     child: Row(
@@ -205,10 +205,10 @@ class WaypointInfoSheet extends StatelessWidget {
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.04),
+                        color: Colors.white.withValues(alpha: 0.04),
                         borderRadius: BorderRadius.circular(1),
                         border: Border.all(
-                          color: Colors.white.withOpacity(0.08),
+                          color: Colors.white.withValues(alpha: 0.08),
                         ),
                       ),
                       child: Text(
@@ -227,9 +227,9 @@ class WaypointInfoSheet extends StatelessWidget {
                   // Clear Metadata Grid
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.03),
+                      color: Colors.white.withValues(alpha :0.03),
                       borderRadius: BorderRadius.circular(1),
-                      border: Border.all(color: Colors.white.withOpacity(0.08)),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                     ),
                     child: Column(
                       children: [
@@ -393,7 +393,7 @@ class WaypointInfoSheet extends StatelessWidget {
     return Divider(
       height: 1,
       thickness: 1,
-      color: Colors.white.withOpacity(0.06),
+      color: Colors.white.withValues(alpha :0.06),
     );
   }
 
@@ -408,7 +408,7 @@ class WaypointInfoSheet extends StatelessWidget {
       child: OutlinedButton(
         style: OutlinedButton.styleFrom(
           foregroundColor: color,
-          side: BorderSide(color: color.withOpacity(0.25), width: 1),
+          side: BorderSide(color: color.withValues(alpha: 0.25), width: 1),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(1)),
           padding: EdgeInsets.zero,
         ),
